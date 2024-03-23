@@ -8,6 +8,19 @@ class SeleniumSandbox(object):
     def __init__(self):
         self.driver = webdriver.Chrome()
 
+    # a _post_process decorator function
+    def _post_process(func):
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            inputs = result["driver"].find_elements(By.TAG_NAME,"input");
+            inputs += result["driver"].find_elements(By.TAG_NAME,"button");
+            inputs += result["driver"].find_elements(By.TAG_NAME,"a");
+            inputs += result["driver"].find_elements(By.TAG_NAME,"textarea");
+            result["inputs"] = inputs
+            return result
+        return wrapper
+
+    @_post_process
     def execute_code(self, code):
         print(globals())
         local_vars = {"driver":self.driver, "result": None}
@@ -15,8 +28,7 @@ class SeleniumSandbox(object):
         exec(code, global_vars, local_vars)
         return local_vars
 
-    def post_execute(self, result):
-        return result
+    
 
 if __name__ == "__main__":
     sandbox = SeleniumSandbox()
@@ -34,10 +46,6 @@ suggestions = WebDriverWait(driver, 10).until(
 )
 
 result = [suggestion.text for suggestion in suggestions]
-inputs = driver.find_elements(By.TAG_NAME,"input");
-inputs += driver.find_elements(By.TAG_NAME,"button");
-inputs += driver.find_elements(By.TAG_NAME,"a");
-inputs += driver.find_elements(By.TAG_NAME,"textarea");
 """
 
     b = """
