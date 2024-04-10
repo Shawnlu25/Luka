@@ -9,6 +9,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.12"
 selenium = "^4.19.0"
+validators = "^0.28.0"
 
 
 [build-system]
