@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "luka"
+version = "0.1.0"
+description = ""
+authors = ["Zefu Lu <shawnlu25@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+selenium = "^4.19.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
