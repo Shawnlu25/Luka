@@ -12,65 +12,33 @@ class SeleniumSandbox(object):
 
         self.window_size = window_size
         self.driver.set_window_size(window_size[0], window_size[1])
-        self.elements_clickable = []
-        self.elements_textable = []
+        self.elements = []
 
-    @staticmethod
-    def _retrieve_clickable_elements(func):
-        def wrapper(*args, **kwargs):
-            find_items_script = """
-                return Array.from(document.querySelectorAll('a, button, input[type=button], input[type=submit], [role="button"]'))
-                    .filter(el => {
-                        const rect = el.getBoundingClientRect();
-                        const isVisible = (rect.top >= 0 || rect.bottom <= window.innerHeight) && (rect.left >= 0 || rect.right <= window.innerWidth) && rect.height > 0 && rect.width > 0;
-                        const isNotOccluded = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) === el;
-                        return isVisible && isNotOccluded;
-                        }
-                    ); 
-                """
-            args[0].elements_clickable = args[0].driver.execute_script(find_items_script)
-            return func(*args, **kwargs)
-        return wrapper
-
-    @staticmethod
-    def _retrieve_textable_elements(func):
-        def wrapper(*args, **kwargs):
-            find_items_script = """
-                const textareas = Array.from(document.querySelectorAll('textarea'));
-                const textInputs = Array.from(document.querySelectorAll(
-                    'input[type="text"], input[type="password"], input[type="email"], input[type="search"], input[type="number"], input[type="tel"], input[type="url"]'
-                ));
-                return textareas.concat(textInputs)
-                    .filter(el => {
-                        const rect = el.getBoundingClientRect();
-                        const isVisible = (rect.top >= 0 || rect.bottom <= window.innerHeight) && (rect.left >= 0 || rect.right <= window.innerWidth) && rect.height > 0 && rect.width > 0;
-                        const isNotOccluded = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) === el;
-                        return isVisible && isNotOccluded;
-                        }
-                    ); 
-                """
-            args[0].elements_textable = args[0].driver.execute_script(find_items_script)
-            return func(*args, **kwargs)
-        return wrapper
-    
-
-    @_retrieve_clickable_elements
     def click(self, index):
-        if index >= len(self.elements_clickable):
+        if index >= len(self.elements):
             raise ValueError("error: index out of range")
-        self.elements_clickable[index].click()
-
-    @_retrieve_textable_elements
-    def type(self, index, text, enter=False, clear=True):
-        if index >= len(self.elements_textable):
-            raise ValueError("error: index out of range")
-        if clear:
-            self.elements_textable[index].clear()
+        if self.elements[index]["tag"] != "link":
+            raise ValueError("error: element is not clickable")
         
-        self.elements_textable[index].send_keys(text)
+        remove_target_attr_script = """
+            var element = arguments[0];
+            element.removeAttribute('target');
+        """
+        self.driver.execute_script(remove_target_attr_script, self.elements[index]["element"])
+        self.elements[index]["element"].click()
+
+    def type(self, index, text, enter=False, clear=True):
+        if index >= len(self.elements):
+            raise ValueError("error: index out of range")
+        if self.elements[index]["tag"] != "input":
+            raise ValueError("error: element is not textable")
+        if clear:
+            self.elements[index]["element"].clear()
+        
+        self.elements[index]["element"].send_keys(text)
         
         if enter:
-            self.elements_textable[index].send_keys(Keys.RETURN)
+            self.elements[index]["element"].send_keys(Keys.RETURN)
 
     def visit(self, url):
         url = url if url.startswith("http") else "http://" + url
@@ -128,10 +96,11 @@ class SeleniumSandbox(object):
             check_scroll_complete
         )
 
-    def _apply_overlays_by_elements(self, elements, rgba_color=(255, 255, 0, 0.5)):
+    def _apply_overlays_by_elements(self, elements, ids, rgba_color=(255, 255, 0, 0.5)):
         rgba_color_str = f"rgba({int(rgba_color[0])}, {int(rgba_color[1])}, {int(rgba_color[2])}, {float(rgba_color[3])})"
         overlay_script = f"""
         var els = arguments[0];
+        var ids = arguments[1];
         if (!window.clickableOverlays) {{
             window.clickableOverlays = [];
         }}
@@ -146,19 +115,16 @@ class SeleniumSandbox(object):
             overlay.style.color = 'black';
             overlay.style.zIndex = '10000';
             overlay.style.pointerEvents = 'none'; // Allows clicks to pass through
-            overlay.textContent = index; // Sequence number
+            overlay.textContent = ids[index]; // Sequence number
             overlay.style.textAlign = 'center';
             overlay.style.lineHeight = el.getBoundingClientRect().height + 'px';
             document.body.appendChild(overlay);
             window.clickableOverlays.push(overlay);
         }});
         """
-        self.driver.execute_script(overlay_script, elements)
+        self.driver.execute_script(overlay_script, elements, ids)
 
-
-    @_retrieve_textable_elements
-    @_retrieve_clickable_elements
-    def apply_overlays(self):
+    def reset_overlays(self):
         self.driver.execute_script("""
             if (window.clickableOverlays && window.clickableOverlays.length > 0) {
                 window.clickableOverlays.forEach(function(overlay) {
@@ -167,14 +133,102 @@ class SeleniumSandbox(object):
             }
             window.clickableOverlays = [];
         """)
-        self._apply_overlays_by_elements(self.elements_clickable, rgba_color=(255, 255, 0, 0.5))
-        self._apply_overlays_by_elements(self.elements_textable, rgba_color=(255, 0, 255, 0.5))
+
+    def apply_overlays(self):
+        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "link"], [e["id"] for e in self.elements if e["tag"] == "link"], rgba_color=(255, 255, 0, 0.5))
+        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "input"], [e["id"] for e in self.elements if e["tag"] == "input"], rgba_color=(255, 0, 255, 0.5))
+        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "text"], [e["id"] for e in self.elements if e["tag"] == "text"], rgba_color=(0, 255, 255, 0.5))
     
+    def retrieve_elements(self):
+        script = """
+            // Get clickable elements
+            var clickableElements = Array.from(document.querySelectorAll('a, button, input[type=button], input[type=submit], [role="button"]'))
+                .filter(el => {
+                    const rect = el.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0;
+                    }
+                ).map(
+                    el => ({
+                        element: el,
+                        tag: "link",
+                        text: el.innerText.trim()
+                    })
+                );
+            
+            // Get text input elements
+            const textareas = Array.from(document.querySelectorAll('textarea'));
+            const textInputs = Array.from(document.querySelectorAll(
+                'input[type="text"], input[type="password"], input[type="email"], input[type="search"], input[type="number"], input[type="tel"], input[type="url"]'
+            ));
+            var textInputElements = textareas.concat(textInputs)
+                .filter(el => {
+                    const rect = el.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0;
+                    }
+                ).map(
+                    el => ({
+                        element: el,
+                        tag: "input",
+                        text: el.innerText.trim()
+                    })
+                );
+            
+            // Get readable elements
+            var readableElements = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, label'))
+                .filter(el => {
+                    const rect = el.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0 && el.textContent.trim().length > 0;
+                })
+                .filter(el => 
+                    Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '')
+                ).map(
+                    el => {
+                        const textContent = Array.from(el.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.nodeValue.trim()).join(' ');
+                        return {
+                            element: el,
+                            tag: "text",
+                            text: textContent
+                        }
+                    }
+                );
+            
+            return clickableElements.concat(textInputElements).concat(readableElements)
+                .map(el => ({
+                    element: el.element,
+                    tag: el.tag,
+                    text: el.text,
+                    x: el.element.getBoundingClientRect().x,
+                    y: el.element.getBoundingClientRect().y,
+                    type: el.element.getAttribute('type'),
+                    placeholder: el.element.getAttribute('placeholder'),
+                    aria_label: el.element.getAttribute('aria-label'),
+                    title: el.element.getAttribute('title'),
+                    alt: el.element.getAttribute('alt')
+                }));
+        """
+        elements = self.driver.execute_script(script)
+        
+        # sort according to y then x element position
+        elements = sorted(elements, key=lambda e: (e["y"], e["x"]))
+        for idx, e in enumerate(elements):
+            e["id"] = idx
+        self.elements = elements
+            
 
 if __name__ == "__main__":
     sandbox = SeleniumSandbox()
     sandbox.visit("https://google.com")
+    #sandbox.get_dom_snapshot()
+    sandbox.reset_overlays()
+    sandbox.retrieve_elements()
     sandbox.apply_overlays()
+    
     while True:
         command = input("> ")
         
@@ -207,9 +261,7 @@ if __name__ == "__main__":
         else:
             sandbox.scroll()
 
+        sandbox.reset_overlays()
+        sandbox.retrieve_elements()
         sandbox.apply_overlays()
-
-            
         
-    
-
