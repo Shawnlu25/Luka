@@ -13,7 +13,7 @@ class SeleniumSandbox(object):
 
         self._window_size = window_size
         self._driver.set_window_size(window_size[0], window_size[1])
-        
+
         self._elements = []
 
     @property
@@ -29,6 +29,14 @@ class SeleniumSandbox(object):
             return window.scrollY / (document.body.scrollHeight - window.innerHeight);
         """
         return self._driver.execute_script(script)
+    
+    @property
+    def page_elements(self):
+        return [{k: e[k] for k in e if k != "element"} for e in self._elements]
+    
+    def reset(self):
+        self._driver.quit()
+        self._driver = webdriver.Chrome()
 
     def click(self, index):
         if index >= len(self._elements):
