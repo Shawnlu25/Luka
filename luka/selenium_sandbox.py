@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.common import exceptions as E
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -8,44 +9,69 @@ import validators
 
 class SeleniumSandbox(object):
     def __init__(self, window_size=(1024, 768)):
-        self.driver = webdriver.Chrome()
+        self._driver = webdriver.Chrome()
 
-        self.window_size = window_size
-        self.driver.set_window_size(window_size[0], window_size[1])
-        self.elements = []
+        self._window_size = window_size
+        self._driver.set_window_size(window_size[0], window_size[1])
+        
+        self._elements = []
+
+    @property
+    def current_url(self):
+        return self._driver.current_url
+
+    @property
+    def scroll_progress(self):
+        script = """
+            if (document.body.scrollHeight === window.innerHeight) {
+                return 1.0;
+            }
+            return window.scrollY / (document.body.scrollHeight - window.innerHeight);
+        """
+        return self._driver.execute_script(script)
 
     def click(self, index):
-        if index >= len(self.elements):
+        if index >= len(self._elements):
             raise ValueError("error: index out of range")
-        if self.elements[index]["tag"] != "link":
+        if self._elements[index]["tag"] != "link":
             raise ValueError("error: element is not clickable")
         
         remove_target_attr_script = """
             var element = arguments[0];
             element.removeAttribute('target');
         """
-        self.driver.execute_script(remove_target_attr_script, self.elements[index]["element"])
-        self.elements[index]["element"].click()
+        self._driver.execute_script(remove_target_attr_script, self._elements[index]["element"])
+
+        try:
+            self._elements[index]["element"].click()
+        except Exception as e:
+            raise e
 
     def type(self, index, text, enter=False, clear=True):
-        if index >= len(self.elements):
+        if index >= len(self._elements):
             raise ValueError("error: index out of range")
-        if self.elements[index]["tag"] != "input":
+        if self._elements[index]["tag"] != "input":
             raise ValueError("error: element is not textable")
         if clear:
-            self.elements[index]["element"].clear()
+            self._elements[index]["element"].clear()
         
-        self.elements[index]["element"].send_keys(text)
+        self._elements[index]["element"].send_keys(text)
         
         if enter:
-            self.elements[index]["element"].send_keys(Keys.RETURN)
+            self._elements[index]["element"].send_keys(Keys.RETURN)
 
     def visit(self, url):
         url = url if url.startswith("http") else "http://" + url
         if not validators.url(url):
             raise ValueError("error: visiting invalid URL")
 
-        self.driver.get(url)
+        self._driver.get(url)
+    
+    def go_back(self):
+        self._driver.execute_script("window.history.go(-1)")
+    
+    def go_forward(self):
+        self._driver.execute_script("window.history.go(1)")
 
     def scroll(self, scroll_down=True, duration = 1000):
         if scroll_down:
@@ -91,8 +117,8 @@ class SeleniumSandbox(object):
             element = driver.find_element(By.TAG_NAME, "body")
             return element.get_attribute(f"data-{completion_signal}") == "true"
 
-        self.driver.execute_script(ease_out_scroll_script)
-        WebDriverWait(self.driver, duration / 1000 + 2).until(
+        self._driver.execute_script(ease_out_scroll_script)
+        WebDriverWait(self._driver, duration / 1000 + 2).until(
             check_scroll_complete
         )
 
@@ -122,10 +148,10 @@ class SeleniumSandbox(object):
             window.clickableOverlays.push(overlay);
         }});
         """
-        self.driver.execute_script(overlay_script, elements, ids)
+        self._driver.execute_script(overlay_script, elements, ids)
 
     def reset_overlays(self):
-        self.driver.execute_script("""
+        self._driver.execute_script("""
             if (window.clickableOverlays && window.clickableOverlays.length > 0) {
                 window.clickableOverlays.forEach(function(overlay) {
                     overlay.style.display = 'none';
@@ -135,9 +161,9 @@ class SeleniumSandbox(object):
         """)
 
     def apply_overlays(self):
-        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "link"], [e["id"] for e in self.elements if e["tag"] == "link"], rgba_color=(255, 255, 0, 0.5))
-        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "input"], [e["id"] for e in self.elements if e["tag"] == "input"], rgba_color=(255, 0, 255, 0.5))
-        self._apply_overlays_by_elements([e["element"] for e in self.elements if e["tag"] == "text"], [e["id"] for e in self.elements if e["tag"] == "text"], rgba_color=(0, 255, 255, 0.5))
+        self._apply_overlays_by_elements([e["element"] for e in self._elements if e["tag"] == "link"], [e["id"] for e in self._elements if e["tag"] == "link"], rgba_color=(255, 255, 0, 0.5))
+        self._apply_overlays_by_elements([e["element"] for e in self._elements if e["tag"] == "input"], [e["id"] for e in self._elements if e["tag"] == "input"], rgba_color=(255, 0, 255, 0.5))
+        self._apply_overlays_by_elements([e["element"] for e in self._elements if e["tag"] == "text"], [e["id"] for e in self._elements if e["tag"] == "text"], rgba_color=(0, 255, 255, 0.5))
     
     def retrieve_elements(self):
         script = """
@@ -212,23 +238,25 @@ class SeleniumSandbox(object):
                     alt: el.element.getAttribute('alt')
                 }));
         """
-        elements = self.driver.execute_script(script)
+        elements = self._driver.execute_script(script)
         
         # sort according to y then x element position
         elements = sorted(elements, key=lambda e: (e["y"], e["x"]))
         for idx, e in enumerate(elements):
             e["id"] = idx
-        self.elements = elements
+        self._elements = elements
             
 
 if __name__ == "__main__":
     sandbox = SeleniumSandbox()
     sandbox.visit("https://google.com")
-    #sandbox.get_dom_snapshot()
+    
     sandbox.reset_overlays()
     sandbox.retrieve_elements()
     sandbox.apply_overlays()
-    
+    print(sandbox.current_url)
+    print(sandbox.scroll_progress)
+
     while True:
         command = input("> ")
         
@@ -236,15 +264,22 @@ if __name__ == "__main__":
             try:
                 url = command.split(" ")[1]
                 sandbox.visit(url)
-            except:
-                print("error: invalid URL")
+            except Exception as e:
+                print(e)
+
+        elif command == "b":
+            sandbox.go_back()
+
+        elif command == "f":
+            sandbox.go_forward()
 
         elif command.startswith("c"):
             try:
                 index = int(command.split(" ")[1])
                 sandbox.click(index)
-            except ValueError:
-                print("error: invalid index")
+            except Exception as e:
+                print(e)
+
         elif command.startswith("t"):
             try:
                 cmd = command.split(" ")[0]
@@ -254,14 +289,17 @@ if __name__ == "__main__":
                     sandbox.type(index, text)
                 elif cmd == "te":
                     sandbox.type(index, text, enter=True)
-            except ValueError:
-                print("error: invalid index")
+            except Exception as e:
+                print(e)
+
         elif command == "u":
             sandbox.scroll(scroll_down=False)
+
         else:
             sandbox.scroll()
 
         sandbox.reset_overlays()
         sandbox.retrieve_elements()
         sandbox.apply_overlays()
-        
+        print(sandbox.current_url)
+        print(sandbox.scroll_progress)
