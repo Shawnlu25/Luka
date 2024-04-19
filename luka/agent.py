@@ -20,7 +20,7 @@ You can issue these commands:
 	TYPESUBMIT <ID> <TEXT> - same as TYPE above, except then it presses ENTER to submit the form
     BACK - go back to the previous page
     FORWARD - go forward to the next page
-    COMPLETE <TEXT> - indicate that you have completed the objective, and provide any comments you have in <TEXT
+    COMPLETE <TEXT> - indicate that you have completed the objective, and provide any comments you have in <TEXT>
 
 The format of the browser content is highly simplified; all formatting elements are stripped.
 Interactive elements such as links, inputs are represented like this:
