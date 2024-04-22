@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+import atexit
 import validators
 
 class SeleniumSandbox(object):
@@ -15,6 +16,7 @@ class SeleniumSandbox(object):
         self._driver.set_window_size(window_size[0], window_size[1])
 
         self._elements = []
+        atexit.register(self.cleanup)
 
     @property
     def current_url(self):
@@ -37,8 +39,11 @@ class SeleniumSandbox(object):
     def reset(self):
         self._driver.quit()
         self._driver = webdriver.Chrome()
+    
+    def cleanup(self):
+        self._driver.quit()
 
-    def click(self, index):
+    def click(self, index: int):
         if index >= len(self._elements):
             raise ValueError("error: index out of range")
         if self._elements[index]["tag"] != "link":
@@ -55,7 +60,7 @@ class SeleniumSandbox(object):
         except Exception as e:
             raise e
 
-    def type(self, index, text, enter=False, clear=True):
+    def type(self, index: int, text: str, enter: bool=False, clear: bool=True):
         if index >= len(self._elements):
             raise ValueError("error: index out of range")
         if self._elements[index]["tag"] != "input":
@@ -68,7 +73,7 @@ class SeleniumSandbox(object):
         if enter:
             self._elements[index]["element"].send_keys(Keys.RETURN)
 
-    def visit(self, url):
+    def visit(self, url: str):
         url = url if url.startswith("http") else "http://" + url
         if not validators.url(url):
             raise ValueError("error: visiting invalid URL")
@@ -81,7 +86,7 @@ class SeleniumSandbox(object):
     def go_forward(self):
         self._driver.execute_script("window.history.go(1)")
 
-    def scroll(self, scroll_down=True, duration = 1000):
+    def scroll(self, scroll_down: bool=True, duration: int=1000):
         if scroll_down:
             scroll_direction = "+"
         else:

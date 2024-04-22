@@ -11,6 +11,8 @@ python = "^3.12"
 selenium = "^4.19.0"
 validators = "^0.28.0"
 litellm = "^1.35.8"
+pexpect = "^4.9.0"
+ptyprocess = "^0.7.0"
 
 
 [build-system]
