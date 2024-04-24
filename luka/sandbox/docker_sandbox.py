@@ -83,6 +83,7 @@ class DockerSandbox:
             raise Exception('Failed to start container')
         
         self.bash_socket = self.docker_client.api.attach_socket(self.container.id, params={'stdin': 1, 'stdout': 1, 'stderr': 1, 'stream': 1})
+        self.bash_socket._sock.setblocking(False)
 
 
     def _close(self):
@@ -101,7 +102,10 @@ class DockerSandbox:
     def fetch_output(self):
         output = b""
         while True:
-            part = self.bash_socket._sock.recv(1024)
+            try:
+                part = self.bash_socket._sock.recv(1024)
+            except BlockingIOError:
+                part = b""
             output += part
             if len(part) < 1024:
                 break

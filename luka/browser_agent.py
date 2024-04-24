@@ -190,7 +190,7 @@ class BrowserAgent:
         
         elif command[0] == "BACK":
             self._sandbox.go_back()
-        elif command == "f":
+        elif command == "FORWARD":
             self._sandbox.go_forward()
         else:
             exception = "Invalid command"
