@@ -1,6 +1,7 @@
 import ptyprocess
 import os
 import atexit
+import time
 
 class LocalSandbox:
     def __init__(self, timeout: int = 120, cwd: str = None):
@@ -15,10 +16,10 @@ class LocalSandbox:
                 }
         )
         
-        atexit.register(self.cleanup)
+        atexit.register(self._cleanup)
         
-    def reset(self):
-        self.cleanup()
+    def _reset(self):
+        self._cleanup()
         self.session = ptyprocess.PtyProcess.spawn(
             ["bash"], 
             cwd=self.cwd, 
@@ -28,29 +29,36 @@ class LocalSandbox:
                 }
         )
     
-    def cleanup(self):
+    def _cleanup(self):
         self.session.terminate(force=True)
 
-    def execute(self, command: str):
+    def send_command(self, command: str):
         command = command.strip()
         self.session.write(command.encode("utf-8") + b"\n")
-        self.session.write(b"echo -e ''\n")
-        output = []
+    
+    def fetch_output(self):
+        output = b""
         while True:
-            line = self.session.readline().decode("utf-8")
-            if "echo -e ''" in line:
-                line = self.session.readline()
+            part = self.session.read(1024)
+            output += part
+            if len(part) < 1024:
                 break
-            output.append(line)
-        print(''.join(output).strip())
+        return output.decode("utf-8")
         
-
 if __name__ == "__main__":
     sandbox = LocalSandbox()
     while True:
         cmd = input("> ")
         if cmd == "exit":
             break
-        sandbox.execute(cmd)
+        elif cmd.startswith("CTRL-"):
+            ch = cmd.split("-")[1].lower()
+            # convert ascii character to control character
+            ch = chr(ord(ch) - ord('a') + 1)
+            sandbox.send_command(ch)
+            continue
+        sandbox.send_command(cmd)
+        time.sleep(0.5)
+        print(sandbox.fetch_output())
         
     
