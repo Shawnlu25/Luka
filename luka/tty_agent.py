@@ -48,8 +48,9 @@ class TTYAgent():
         data = self._sandbox.fetch_output()
         if len(data) > self._buf_size:
             data = data[-self._buf_size:]
+        print(data)
         # append data to buffer, shrink buffer if necessary
-        self._buffer = self._buffer[:self._buf_size-len(data)] + data
+        self._buffer = self._buffer[-(self._buf_size-len(data)):] + data
         return self._buffer
     
     def _act(self, command):
@@ -90,7 +91,7 @@ class TTYAgent():
             
             content = self._get_content()
             user_prompt = user_prompt.replace("$content", content)
-            print(content)
+            #print(content)
 
             response = completion(
                 model=self._model,
