@@ -5,16 +5,19 @@ import os
 import atexit
 
 DEFAULT_IMAGE = "luka:1.0"
+DEFAULT_RUNTIME = "runsc"
+DEFAULT_HOME_DIR = "/home/ubuntu"
 CONTAINER_NAME_PREFIX = "luka"
 
 class DockerSandbox:
-    def __init__(self, image: str=DEFAULT_IMAGE, timeout = 60):
+    def __init__(self, image: str=DEFAULT_IMAGE, window_size=(24, 80), timeout = 60):
         self.sid = str(uuid.uuid4())
         self.docker_client = docker.from_env()
 
         self.image_name = image
         self.container_name = f"{CONTAINER_NAME_PREFIX}-{self.sid}"
 
+        self.window_size = window_size
         self.timeout = timeout
         self._restart_container()
 
@@ -53,15 +56,17 @@ class DockerSandbox:
         try:
             self.container = self.docker_client.containers.run(
                 self.image_name,
-                command='tail -f /dev/null',
+                command="/bin/bash",#'tail -f /dev/null',
                 network_mode='host',
-                working_dir="/home/ubuntu/workspace",
+                working_dir= DEFAULT_HOME_DIR + "/workspace",
                 name=self.container_name,
+                runtime=DEFAULT_RUNTIME, 
                 detach=True,
                 tty=True,
                 stdin_open=True,
-                volumes={mount_dir: {'bind': "/home/ubuntu/workspace", 'mode': 'rw'}},
+                volumes={mount_dir: {'bind': DEFAULT_HOME_DIR + "/workspace", 'mode': 'rw'}},
             )
+            self.container.resize(height=self.window_size[0], width=self.window_size[1])
         except Exception as e:
             raise e
         
@@ -77,7 +82,8 @@ class DockerSandbox:
         if self.container.status != 'running':
             raise Exception('Failed to start container')
         
-        self.bash_socket = self.container.exec_run("/bin/bash", detach=False, tty=True, stdin=True, socket=True)[1]
+        self.bash_socket = self.docker_client.api.attach_socket(self.container.id, params={'stdin': 1, 'stdout': 1, 'stderr': 1, 'stream': 1})
+
 
     def _close(self):
         containers = self.docker_client.containers.list(all=True)
@@ -88,9 +94,9 @@ class DockerSandbox:
             except docker.errors.NotFound:
                 pass
 
-    def execute_command(self, command):
+    def send_command(self, command):
         s = self.bash_socket
-        s._sock.send(command.encode('utf-8'))
+        s._sock.sendall(command.encode('utf-8'))
     
     def fetch_output(self):
         output = b""
@@ -104,23 +110,18 @@ class DockerSandbox:
 
 if __name__ == "__main__":
     sandbox = DockerSandbox()
-
+    
     while True:
         cmd = input("> ")
         cmd = cmd.strip()
         if cmd == "exit":
             break
-        sandbox.execute_command(cmd+"\n")
+        elif cmd.startswith("CTRL-"):
+            ch = cmd.split("-")[1].lower()
+            # convert ascii character to control character
+            ch = chr(ord(ch) - ord('a') + 1)
+            sandbox.send_command(ch)
+            continue
+        sandbox.send_command(cmd+"\n")
+        time.sleep(0.5)
         print(sandbox.fetch_output())
-
-    
-
-exit()
-
-def execute_detached_command(container, command):
-    exec_instance = container.exec_run(command, detach=True)
-    exec_id = exec_instance.id
-    return exec_id
-
-def fetch_exec_output(client, exec_id):
-    return client.api.exec_start(exec_id, detach=False).decode('utf-8')
