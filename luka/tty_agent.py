@@ -7,6 +7,7 @@ SYSTEM_PROMPT = """
 You are an agent controlling a bash terminal. You are given:
     1. an objective that you are trying to achieve
     2. the content on the terminal
+    3. previous command history
 
 You can issue the following commands to the terminal:
     1. Any bash command that you believe will get you closer to achieving your goal, one command at a time
@@ -19,6 +20,8 @@ Based on your given objective, issue whatever command you believe will get you c
 
 Note that the content of current terminal has a buffer size. If you think the content is too long, try use `less`, `head`, `tail` commands to view the content with pipes.
 
+Sometimes the previous command is still running, please wait for the command to finish before issuing the next command.
+
 The objective and the content of terminal follow, please issue your next command to the terminal.
 """
 
@@ -26,6 +29,11 @@ USER_PROMPT = """
 TERMINAL SCREEN
 ===============================
 $content
+===============================
+
+LAST 5 COMMANDS
+===============================
+$commands
 ===============================
 OBJECTIVE: $objective
 YOUR COMMAND:
@@ -91,7 +99,8 @@ class TTYAgent():
             
             content = self._get_content()
             user_prompt = user_prompt.replace("$content", content)
-            #print(content)
+            last_commands = "\n".join([h["command"] for h in self._history[-5:]])
+            user_prompt = user_prompt.replace("$commands", last_commands)
 
             response = completion(
                 model=self._model,
