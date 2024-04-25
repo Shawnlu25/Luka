@@ -56,8 +56,8 @@ class DockerSandbox:
         try:
             self.container = self.docker_client.containers.run(
                 self.image_name,
-                command="/bin/bash",#'tail -f /dev/null',
-                network_mode='host',
+                command="/bin/bash",
+                network_mode='bridge',
                 working_dir= DEFAULT_HOME_DIR + "/workspace",
                 name=self.container_name,
                 runtime=DEFAULT_RUNTIME, 
