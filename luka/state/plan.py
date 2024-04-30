@@ -1,7 +1,7 @@
 
 from pydantic import BaseModel, Field
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, TypeVar, Generic
 
 import instructor
 from litellm import completion
@@ -12,11 +12,14 @@ class TaskState(str, Enum):
     completed = "completed"
     abandoned = "abandoned"
 
-class Task(BaseModel):
+T = TypeVar('T', bound=str)
+
+class Task(BaseModel, Generic[T]):
     id: str = Field(..., title="Unique identifier of the task")
     goal: str = Field(..., title="A short summary of what should be achieved")
     description: str = Field(..., title="Additional details about the task")
     state: TaskState = Field(TaskState.open, title="The current state of the task, default to be open")
+    assignee: T = Field(..., title="The agent who is responsible for completing the task")
     #subtasks = None #Optional[List['Task']] = Field([], title="Subtasks of the current task, to be completed in order")
 
     def to_string(self, indent=''):
@@ -29,7 +32,7 @@ class Task(BaseModel):
             emoji = '⏳'
         elif self.state == TaskState.open:
             emoji = '🔲'
-        result = indent + emoji + ' ' + str(self.id) + ' ' + self.goal + '\n'
+        result = indent + emoji + ' ' + str(self.id) + ' [' + self.assignee + '] ' + self.goal + '\n'
 
         #if self.subtasks:
             #result += ''.join([s.to_string(indent + '    ') for s in self.subtasks])
@@ -62,8 +65,8 @@ class Task(BaseModel):
         return None
 
 
-class Plan(BaseModel):
-    tasks: List[Task] = Field([], title="A list of tasks to be completed in order")
+class Plan(BaseModel, Generic[T]):
+    tasks: List[Task[T]] = Field([], title="A list of tasks to be completed in order")
 
     def __str__(self):
         return ''.join([t.to_string() for t in self.tasks])
