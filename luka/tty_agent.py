@@ -22,7 +22,16 @@ Note that the content of current terminal has a buffer size. If you think the co
 
 Sometimes the previous command is still running, please wait for the command to finish before issuing the next command.
 
+You might also be given additional information that you should use to achieve the objective.
+
 The objective and the content of terminal follow, please issue your next command to the terminal.
+"""
+
+INFO_PROMPT = """
+ADDITIONAL INFO
+===============================
+$info
+===============================
 """
 
 USER_PROMPT = """
@@ -92,7 +101,7 @@ class TTYAgent():
         })
         
 
-    def run(self, objective):
+    def run(self, objective, info=""):
         completed = False
         while not completed:
             user_prompt = USER_PROMPT.replace("$objective", objective)
@@ -106,6 +115,7 @@ class TTYAgent():
                 model=self._model,
                 messages = [
                     {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": INFO_PROMPT.replace("$info", info)},
                     {"role": "user", "content": user_prompt}
                 ]
             )

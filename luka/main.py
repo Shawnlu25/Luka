@@ -51,7 +51,7 @@ class Orchestrator():
         self._agents = {k: v["cls"]() for k,v in AGENT_REGISTRY.items()}
 
     def run(self, objective):
-        
+        prev_info = ""
         while True:
             user_prompt = USER_PROMPT.replace('$objective', objective)
             user_prompt = user_prompt.replace('$plan', str(self._plan) if self._plan else 'None')
@@ -87,7 +87,7 @@ class Orchestrator():
             print(next_task.description)
 
             assignee = self._agents[next_task.assignee]
-            assignee.run(next_task.description)
+            prev_info = assignee.run(next_task.description, info=prev_info)
 
             next_task.state = TaskState.completed
             self._plan.conform_state()

@@ -30,9 +30,9 @@ Interactive elements such as links, inputs are represented like this:
 
 Based on your given objective, issue whatever command you believe will get you closest to achieving your goal.
 
-You start on about:blank, but you can visit any site directly.
+You start on about:blank, but you can visit any site directly. Usually you should start on google.com and search from there.
 
-Don't try to interact with elements that you can't see.
+Don't try to interact with elements that you can't see. Avoid visiting repeated URLs.
 
 Here are some examples:
 
@@ -65,7 +65,16 @@ YOUR COMMAND:
 TYPESUBMIT 8 anchorage redfin
 ==================================================
 
+You might also be given additional information that you should use to achieve the objective.
+
 The current browser content, objective, and current URL follow. Reply with your next command to the browser.
+"""
+
+INFO_PROMPT = """
+ADDITIONAL INFO
+===============================
+$info
+===============================
 """
 
 USER_PROMPT = """
@@ -98,7 +107,7 @@ class BrowserAgent:
     
     def reset(self):
         self._history = []
-        self._sandbox.visit("https://www.google.com/")
+        self._sandbox.reset()
 
     def _get_history(self):
         history = ""
@@ -204,7 +213,7 @@ class BrowserAgent:
         })
         
 
-    def run(self, objective):
+    def run(self, objective, info=""):
         completed = False
         while not completed:
             self._sandbox.retrieve_elements()
@@ -223,6 +232,7 @@ class BrowserAgent:
                 model=self._model,
                 messages = [
                     {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": INFO_PROMPT.replace("$info", info)},
                     {"role": "user", "content": user_prompt}
                 ]
             )
@@ -235,7 +245,7 @@ class BrowserAgent:
                 print(self._history[-1]["completed"])
                 self._notepad = self._sandbox.get_text_content()
                 completed = True
-        return self._notepad
+        return "\n".join(self._notepad)
 
     
 if __name__ == "__main__":
