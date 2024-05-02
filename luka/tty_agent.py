@@ -117,6 +117,7 @@ class TTYAgent():
                 print("Objective completed!")
                 print(self._history[-1]["completed"])
                 completed = True
+        return self._history[-1]["completed"]
     
 if __name__ == "__main__":
     agent = TTYAgent()

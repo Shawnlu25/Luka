@@ -178,6 +178,27 @@ class SeleniumSandbox(object):
         self._apply_overlays_by_elements([e["element"] for e in self._elements if e["tag"] == "input"], [e["id"] for e in self._elements if e["tag"] == "input"], rgba_color=(255, 0, 255, 0.5))
         self._apply_overlays_by_elements([e["element"] for e in self._elements if e["tag"] == "text"], [e["id"] for e in self._elements if e["tag"] == "text"], rgba_color=(0, 255, 255, 0.5))
     
+    def get_text_content(self):
+        script = """
+            return Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, label'))
+                .filter(el => 
+                    Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '')
+                ).map(
+                    el => {
+                        const textContent = Array.from(el.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.nodeValue.trim()).join(' ');
+                        return {
+                            element: el,
+                            tag: "text",
+                            text: textContent
+                        }
+                    }
+                );
+        """
+        elements = self._driver.execute_script(script)
+        texts = [e["text"] for e in elements]
+        return texts
+
+
     def retrieve_elements(self):
         script = """
             // Get clickable elements
@@ -304,6 +325,9 @@ if __name__ == "__main__":
                     sandbox.type(index, text, enter=True)
             except Exception as e:
                 print(e)
+        elif command.startswith("j"):
+            sandbox.reset_overlays()
+            print(sandbox.get_text_content())
 
         elif command == "u":
             sandbox.scroll(scroll_down=False)

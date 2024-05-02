@@ -29,8 +29,8 @@ Interactive elements such as links, inputs are represented like this:
 		<input id=3>text</input>
 
 Based on your given objective, issue whatever command you believe will get you closest to achieving your goal.
-You start on Google, but you can visit other sites directly; If you choose to start with Google, you should submit a search query to Google that will take you to the best page for
-achieving your objective. And then interact with that page to achieve your objective.
+
+You start on about:blank, but you can visit any site directly.
 
 Don't try to interact with elements that you can't see.
 
@@ -91,6 +91,7 @@ class BrowserAgent:
     def __init__(self):
         self._sandbox = SeleniumSandbox()
         self._history = []
+        self._notepad = []
 
         self._model = "gpt-4-turbo"
         self._openai_key = os.getenv("OPENAI_API_KEY")
@@ -232,7 +233,9 @@ class BrowserAgent:
             if self._history[-1]["completed"]:
                 print("Objective completed!")
                 print(self._history[-1]["completed"])
+                self._notepad = self._sandbox.get_text_content()
                 completed = True
+        return self._notepad
 
     
 if __name__ == "__main__":
