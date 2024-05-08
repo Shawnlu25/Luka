@@ -14,7 +14,11 @@ litellm = "^1.35.8"
 pexpect = "^4.9.0"
 ptyprocess = "^0.7.0"
 instructor = "^1.2.3"
+whoosh = "^2.7.4"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]

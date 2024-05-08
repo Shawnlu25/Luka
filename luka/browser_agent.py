@@ -157,7 +157,7 @@ class BrowserAgent:
         prev_url = self._sandbox.current_url
         exception = None
         completed = None
-
+        print(command)
         command = command.split(" ")
         if command[0] == "COMPLETE":
             if len(command) == 1:
