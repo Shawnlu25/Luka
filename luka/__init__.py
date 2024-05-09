@@ -1,9 +1,9 @@
-from .browser_agent import BrowserAgent
+from .basic_browser_agent import BasicBrowserAgent
 from .tty_agent import TTYAgent
 
 AGENT_REGISTRY = {
     "browser": {
-        "cls": BrowserAgent,
+        "cls": BasicBrowserAgent,
         "description": "Have access to a web browser to gather information or complete jobs online.",
     },
     "tty": {

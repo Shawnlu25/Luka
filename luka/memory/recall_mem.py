@@ -3,7 +3,6 @@ from datetime import datetime
 
 from whoosh.fields import Schema, TEXT, DATETIME, KEYWORD
 from whoosh.filedb.filestore import RamStorage
-from whoosh.index import create_in
 from whoosh.qparser import QueryParser
 from whoosh.query import DateRange
 

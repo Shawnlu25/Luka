@@ -94,9 +94,7 @@ CURRENT SCROLL POSITION: $scroll_position
 YOUR COMMAND:
 """
 
-
-
-class BrowserAgent:
+class BasicBrowserAgent:
     def __init__(self):
         self._sandbox = SeleniumSandbox()
         self._history = []
@@ -249,7 +247,7 @@ class BrowserAgent:
 
     
 if __name__ == "__main__":
-    agent = BrowserAgent()
+    agent = BasicBrowserAgent()
     while True:
         agent.reset()
         print("Please enter your objective (type `exit` to exit): ")
