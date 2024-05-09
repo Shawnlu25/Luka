@@ -92,3 +92,4 @@ def test_fifo_conversation_memory_insert(fifo_mem):
 
     assert str(fifo_mem)
     fifo_mem.reset()
+    assert len(fifo_mem._message_queue) == 0, "FIFOConversationMemory: message queue should be empty after reset"

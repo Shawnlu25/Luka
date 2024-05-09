@@ -12,19 +12,19 @@ from luka.utils import Message
 # Adapted from https://github.com/cpacker/MemGPT/blob/main/memgpt/memory.py
 class RecallMemory(ABC):
     @abstractmethod
-    def text_search(self, query_string, start=None, limit=None):
+    def text_search(self, query_string, start=None, limit=None):  # pragma: no cover
         pass
 
     @abstractmethod
-    def date_search(self, start_date, end_date, start=None, limit=None):
+    def date_search(self, start_date, end_date, start=None, limit=None):  # pragma: no cover
         pass
 
     @abstractmethod
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         pass
 
     @abstractmethod
-    def insert(self, message: Message):
+    def insert(self, message: Message):  # pragma: no cover
         pass
 
 class TransientRecallMemory(RecallMemory):

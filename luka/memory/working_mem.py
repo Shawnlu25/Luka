@@ -6,15 +6,15 @@ from luka.utils import Message
 
 class WorkingMemory(ABC):
     @abstractmethod
-    def insert(self, record: Any):
+    def insert(self, record: Any):  # pragma: no cover
         """Insert message into working memory"""
     
     @abstractmethod
-    def reset(self):
+    def reset(self):  # pragma: no cover
         """Reset working memory"""
 
     @abstractmethod
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         pass
 
 class FIFOConversationMemory(WorkingMemory):
