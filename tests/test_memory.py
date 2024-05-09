@@ -1,12 +1,26 @@
 import pytest
 
 from luka.memory.recall_mem import TransientRecallMemory
+from luka.memory.working_mem import FIFOConversationMemory
 from luka.utils import Message
 from datetime import datetime
+
+_SUMMARY = "THIS IS A SUMMARY"
 
 @pytest.fixture(scope="module")
 def transient_mem():
     return TransientRecallMemory()
+
+@pytest.fixture(scope="module")
+def fifo_mem():
+    def dummy_tokenize(x):
+        return len(x.split(" "))
+    
+    def dummy_summarize(x):
+        return _SUMMARY
+
+    return FIFOConversationMemory(tokenize=dummy_tokenize, summarize=dummy_summarize, max_size=30, trigger_threshold=0.8, target_threshold=0.5)
+
 
 def test_transient_recall_memory_insert(transient_mem):
     transient_mem.insert(Message(role="user", content="Hello", timestamp=datetime(2024, 5, 1, 15, 30, 0)))
@@ -56,4 +70,25 @@ def test_transient_recall_memory_date_search(transient_mem):
     assert messages[0].timestamp < messages[1].timestamp < messages[2].timestamp, "TransientRecallMemory: messages should be sorted by timestamp"
 
     transient_mem.reset()
+    assert len(transient_mem) == 0, "TransientRecallMemory should have 0 messages"
 
+def test_fifo_conversation_memory_insert(fifo_mem):
+    fifo_mem.insert(Message(role="user", content="Lorem ipsum dolor sit amet, consectetur adipiscing elit.", timestamp=datetime(2024, 5, 1, 15, 30, 0)))
+    messages = fifo_mem._message_queue
+    assert len(messages) == 1, "FIFOConversationMemory: message queue should have 1 message"
+    assert messages[0][0].content == "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "FIFOConversationMemory: message content should match"
+    
+    fifo_mem.insert(Message(role="user", content="Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", timestamp=datetime(2024, 5, 1, 15, 30, 10)))
+    messages = fifo_mem._message_queue
+    assert len(messages) == 2, "FIFOConversationMemory: message queue should have 2 messages"
+    assert messages[0][0].content == "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "FIFOConversationMemory: message content should match"
+    assert messages[1][0].content == "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", "FIFOConversationMemory: message content should match"
+    fifo_mem.insert(Message(role="user", content="Ut enim ad minim veniam", timestamp=datetime(2024, 5, 1, 15, 30, 20)))
+    messages = fifo_mem._message_queue
+    
+    assert len(messages) == 2, "FIFOConversationMemory: message queue should have 2 messages"
+    assert messages[0][0].content == _SUMMARY, "FIFOConversationMemory: first message should be a summary"
+    assert messages[1][0].content == "Ut enim ad minim veniam", "FIFOConversationMemory: second message should be the latest inserted message"
+
+    assert str(fifo_mem)
+    fifo_mem.reset()

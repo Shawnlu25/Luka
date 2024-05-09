@@ -9,6 +9,7 @@ from whoosh.query import DateRange
 
 from luka.utils import Message
 
+# Adapted from https://github.com/cpacker/MemGPT/blob/main/memgpt/memory.py
 class RecallMemory(ABC):
     @abstractmethod
     def text_search(self, query_string, start=None, limit=None):
@@ -27,6 +28,9 @@ class RecallMemory(ABC):
         pass
 
 class TransientRecallMemory(RecallMemory):
+    """
+    A RecallMemory implementation that stores messages in RAM, powered by Whoosh.
+    """
     def __init__(self):
         self._schema = Schema(role=KEYWORD(stored=True), content=TEXT(stored=True), timestamp=DATETIME(stored=True))
         self._index = RamStorage().create_index(self._schema)
