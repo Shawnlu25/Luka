@@ -65,48 +65,6 @@ The current browser content, history of interactions, and objective follow.
 Reply with your next command to the browser.
 """
 
-"""
-Here are some examples:
-
-EXAMPLE 1:
-==================================================
-CURRENT BROWSER CONTENT:
-<link id=1>About</link>
-<link id=2>Store</link>
-<link id=3>Gmail</link>
-<link id=4>Images</link>
-<link id=5>(Google apps)</link>
-<link id=6>Sign in</link>
-<img id=7 alt="(Google)"/>
-<input id=8 alt="Search"></input>
-<link id=9>(Search by voice)</button>
-<link id=10>(Google Search)</button>
-<link id=11>(I'm Feeling Lucky)</button>
-<link id=12>Advertising</link>
-<link id=13>Business</link>
-<link id=14>How Search works</link>
-<link id=15>Carbon neutral since 2007</link>
-<link id=16>Privacy</link>
-<link id=17>Terms</link>
-<text id=18>Settings</text>
-------------------
-HISTORY: 
-[2024-05-01 15:30:00] user:   Find a 2 bedroom house for sale in Anchorage AK for under $750k
-[2024-05-01 15:30:00] agent:  First, I need to get to the Google website.
-[2024-05-01 15:30:30] agent:  VISIT www.google.com
-[2024-05-01 15:30:30] chrome: Success. 
-                              Current page: www.google.com
-                              Current scroll position: 0% (scroll-y=0, scroll-height=2094)
-------------------
-OBJECTIVE:
-Find a 2 bedroom house for sale in Anchorage AK for under $750k
-------------------
-YOUR COMMAND: 
-I need to search for houses in Anchorage in the search bar, redfin is good site for that.
-TYPESUBMIT 8 anchorage redfin
-==================================================
-"""
-
 USER_PROMPT = """
 ------------------
 CURRENT BROWSER CONTENT:
@@ -287,17 +245,12 @@ class ReActBrowserAgent:
 
             self._fifo_mem.insert(Message(role="agent", content=reply.rationale, timestamp=datetime.now()))
             print(self._fifo_mem._message_queue[-1][0])
+            self._fifo_mem.insert(Message(role="agent", content=reply.command, timestamp=datetime.now()))
+            print(self._fifo_mem._message_queue[-1][0])
             completed, browser_msg = self._act(reply.command)
             if not completed:
-                self._fifo_mem.insert(Message(role="agent", content=reply.command, timestamp=datetime.now()))
-                print(self._fifo_mem._message_queue[-1][0])
                 self._fifo_mem.insert(Message(role="chrome", content=browser_msg, timestamp=datetime.now()))
                 print(self._fifo_mem._message_queue[-1][0])
-            else:
-                self._fifo_mem.insert(Message(role="agent", content="Objective completed!", timestamp=datetime.now()))
-                print(self._fifo_mem._message_queue[-1][0])
-            
-            
 
 
 if __name__ == "__main__":
