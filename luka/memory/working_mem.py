@@ -34,7 +34,7 @@ class FIFOConversationMemory(WorkingMemory):
         self._current_size = 0
     
     def insert(self, record: Message):
-        self._message_queue.append((record, self._tokenize(str(record))))
+        self._message_queue.append((record, len(self._tokenize(str(record)))))
         self._current_size += self._message_queue[-1][1]
 
         if self._current_size < self._max_size * self._trigger_threshold:
@@ -51,7 +51,7 @@ class FIFOConversationMemory(WorkingMemory):
         
         summary = self._summarize(popped_messages)
         summary_msg = Message(content=summary, role="system", timestamp=popped_messages[-1].timestamp)
-        self._message_queue.insert(0, (summary_msg, self._tokenize(str(summary_msg))))
+        self._message_queue.insert(0, (summary_msg, len(self._tokenize(str(summary_msg)))))
     
     def __repr__(self) -> str:
         return "\n".join([str(msg) for msg, _ in self._message_queue])

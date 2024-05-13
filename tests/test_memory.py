@@ -14,7 +14,7 @@ def transient_mem():
 @pytest.fixture(scope="module")
 def fifo_mem():
     def dummy_tokenize(x):
-        return len(x.split(" "))
+        return x.split(" ")
     
     def dummy_summarize(x):
         return _SUMMARY

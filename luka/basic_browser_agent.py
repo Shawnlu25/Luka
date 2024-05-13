@@ -148,7 +148,7 @@ class BasicBrowserAgent:
         return {
             "browser_content": browser_content,
             "url": self._sandbox.current_url,
-            "scroll_position": "{:3.2f}".format(self._sandbox.scroll_progress * 100),
+            "scroll_position": "{:3.2f}".format(self._sandbox.scroll_progress[0] * 100),
         }
 
     def _act(self, command):

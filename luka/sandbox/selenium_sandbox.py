@@ -24,13 +24,12 @@ class SeleniumSandbox(object):
 
     @property
     def scroll_progress(self):
-        script = """
-            if (document.body.scrollHeight === window.innerHeight) {
-                return 1.0;
-            }
-            return window.scrollY / (document.body.scrollHeight - window.innerHeight);
-        """
-        return self._driver.execute_script(script)
+        scroll_y = self._driver.execute_script("return window.scrollY;")
+        scroll_height = self._driver.execute_script("return document.body.scrollHeight- window.innerHeight;")
+        if scroll_height == 0:
+            return 1.0, scroll_y, scroll_height
+        percentage = scroll_y / scroll_height
+        return percentage, scroll_y, scroll_height
     
     @property
     def page_elements(self):
