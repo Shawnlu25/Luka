@@ -6,7 +6,7 @@ import instructor
 import os
 from datetime import datetime
 
-from luka.sandbox import SeleniumSandbox
+from luka.envs import SeleniumSandbox
 from luka.memory import FIFOConversationMemory
 from luka.utils import Message
 
@@ -83,6 +83,7 @@ class _AgentReply(BaseModel):
     rationale: str = Field(..., description="The rationale behind the command")
     command: str = Field(..., description="The command to execute")
 
+
 class ReActBrowserAgent:
 
     def __init__(self):
@@ -125,41 +126,10 @@ class ReActBrowserAgent:
             trigger_threshold=0.8, 
             target_threshold=0.5
         )
-        
     
     def reset(self):
         self._sandbox.reset()
         self._fifo_mem.reset()
-
-    def simplify_web_elements(self):
-        self._sandbox.retrieve_elements()
-        elements = self._sandbox.page_elements
-        simplified_dom = ""
-        for e in elements:
-            if e["tag"] == "input":
-                text_attrs = ["text", "placeholder"]
-                meta_attrs = ["type", "alt", "title", "aria_label"]
-            elif e["tag"] == "link":
-                text_attrs = ["text", "aria_label", "title"]
-                meta_attrs = ["type", "alt"]
-            else:
-                text_attrs = ["text"]
-                meta_attrs = []
-
-            text = [x for x in filter(lambda x: x is not None and len(x) > 0, [e[attr] for attr in text_attrs])]
-            text = text[0] if len(text) > 0 else None
-            if text != None and text != e["text"]:
-                text = "(" + text + ")"
-
-            meta_str = " ".join([attr + "=\"" + e[attr] + "\"" for attr in meta_attrs if e[attr] is not None])
-            if len(meta_str) > 0:
-                meta_str = " " + meta_str
-
-            if text is None: 
-                simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}/>\n"
-            else:
-                simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>{text}</{e["tag"]}>\n"
-        return simplified_dom
 
     def _act(self, command:str) -> Tuple[bool, Optional[str]]:
         """
@@ -222,7 +192,7 @@ class ReActBrowserAgent:
         completed = False
 
         while not completed:
-            dom = self.simplify_web_elements()
+            dom = self._sandbox.simplify_web_elements()
             if dom is None:
                 dom = "[empty page]"
             history = str(self._fifo_mem)

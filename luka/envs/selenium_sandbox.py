@@ -34,13 +34,44 @@ class SeleniumSandbox(object):
     @property
     def page_elements(self):
         return [{k: e[k] for k in e if k != "element"} for e in self._elements]
-    
+
     def reset(self):
         self._driver.quit()
         self._driver = webdriver.Chrome()
     
     def cleanup(self):
         self._driver.quit()
+
+
+    def simplify_web_elements(self):
+        self.retrieve_elements()
+        elements = self.page_elements
+        simplified_dom = ""
+        for e in elements:
+            if e["tag"] == "input":
+                text_attrs = ["text", "placeholder"]
+                meta_attrs = ["type", "alt", "title", "aria_label"]
+            elif e["tag"] == "link":
+                text_attrs = ["text", "aria_label", "title"]
+                meta_attrs = ["type", "alt"]
+            else:
+                text_attrs = ["text"]
+                meta_attrs = []
+
+            text = [x for x in filter(lambda x: x is not None and len(x) > 0, [e[attr] for attr in text_attrs])]
+            text = text[0] if len(text) > 0 else None
+            if text != None and text != e["text"]:
+                text = "(" + text + ")"
+
+            meta_str = " ".join([attr + "=\"" + e[attr] + "\"" for attr in meta_attrs if e[attr] is not None])
+            if len(meta_str) > 0:
+                meta_str = " " + meta_str
+
+            if text is None: 
+                simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}/>\n"
+            else:
+                simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>{text}</{e["tag"]}>\n"
+        return simplified_dom
 
     def click(self, index: int):
         if index >= len(self._elements):
@@ -84,6 +115,12 @@ class SeleniumSandbox(object):
     
     def go_forward(self):
         self._driver.execute_script("window.history.go(1)")
+
+    def scroll_up(self):
+        self.scroll(scroll_down=False)
+
+    def scroll_down(self):
+        self.scroll(scroll_down=True)
 
     def scroll(self, scroll_down: bool=True, duration: int=1000):
         if scroll_down:
@@ -196,7 +233,6 @@ class SeleniumSandbox(object):
         elements = self._driver.execute_script(script)
         texts = [e["text"] for e in elements]
         return texts
-
 
     def retrieve_elements(self):
         script = """

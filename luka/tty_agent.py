@@ -1,4 +1,4 @@
-from luka.sandbox import DockerSandbox
+from luka.envs import DockerSandbox
 from litellm import completion
 import os
 import time

@@ -1,4 +1,4 @@
-from luka.sandbox import SeleniumSandbox
+from luka.envs import SeleniumSandbox
 from litellm import completion
 import os
 
