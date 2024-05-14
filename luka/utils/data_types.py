@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+import textwrap
 
 @dataclass
 class Message:
@@ -8,12 +9,9 @@ class Message:
     timestamp: datetime
 
     def __str__(self) -> str:
-        lines = self.content.split('\n')
+        lines = [l.strip() for l in self.content.split('\n') if not l.strip().isspace()]
         formatted_datetime = self.timestamp.strftime("%Y%m%d-%H:%M:%S")
-        indentation = ' ' * (max(len(self.role), 6) + 2 + len(formatted_datetime) + 3)
+        prefix = f"[{formatted_datetime}] {self.role}:"
+        wrapper = textwrap.TextWrapper(subsequent_indent='\t', initial_indent=prefix, width=80)
 
-        if len(lines) > 1:
-            indented_content = ('\n' + indentation).join(lines)
-            return f"[{formatted_datetime}] {self.role}: {lines[0]}{indented_content}"
-        else:
-            return f"[{formatted_datetime}] {self.role}: {self.content}"
+        return wrapper.fill(self.content)
