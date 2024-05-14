@@ -1,4 +1,5 @@
 from .basic_browser_agent import BasicBrowserAgent
+from .react_browser_agent import ReActBrowserAgent
 from .tty_agent import TTYAgent
 
 AGENT_REGISTRY = {

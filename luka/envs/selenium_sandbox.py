@@ -42,8 +42,8 @@ class SeleniumSandbox(object):
     def cleanup(self):
         self._driver.quit()
 
-
     def simplify_web_elements(self):
+        # TODO: turn retrieve_elements into a decorator
         self.retrieve_elements()
         elements = self.page_elements
         simplified_dom = ""

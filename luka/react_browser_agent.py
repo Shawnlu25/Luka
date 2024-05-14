@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Tuple, Optional
 
-from litellm import completion, encode, decode
+from litellm import completion, encode
 import instructor
 import os
 from datetime import datetime
@@ -10,7 +10,6 @@ from luka.envs import SeleniumSandbox
 from luka.memory import FIFOConversationMemory
 from luka.utils import Message
 
-import logging
 
 SYSTEM_PROMPT = """
 You are an agent controlling a browser. You are given:
@@ -177,15 +176,15 @@ class ReActBrowserAgent:
             self._sandbox.go_forward()
         else:
             exception_msg = "Invalid command."
-        if exception_msg is not None:
-            return False, exception_msg
+        
         current_url = self._sandbox.current_url
         scroll_percentage, scroll_y, scroll_height = self._sandbox.scroll_progress
         scroll_percentage = "{:3.2f}".format(scroll_percentage * 100)
         info_str = f"Current url: {current_url}\nCurrent scroll position: {scroll_percentage}% (scroll-y={scroll_y}, scroll-height={scroll_height})"
+
         if exception_msg is not None:
-            return False, f"Action unsuccessful, an exception occured: {exception_msg}\n" + exception_msg
-        return False, f"Action successful!\n" + info_str
+            return False, f"Action unsuccessful, an exception occured: {exception_msg}\n" + info_str
+        return False, "Action successful!\n" + info_str
     
     def run(self, objective, bg_info=None):
         self._fifo_mem.insert(Message(role="user", content=objective, timestamp=datetime.now()))
@@ -212,7 +211,7 @@ class ReActBrowserAgent:
                 ],
                 response_model=_AgentReply,
             )
-
+            # TODO: replace print statements with logging
             self._fifo_mem.insert(Message(role="agent", content=reply.rationale, timestamp=datetime.now()))
             print(self._fifo_mem._message_queue[-1][0])
             self._fifo_mem.insert(Message(role="agent", content=reply.command, timestamp=datetime.now()))
@@ -222,15 +221,4 @@ class ReActBrowserAgent:
                 self._fifo_mem.insert(Message(role="chrome", content=browser_msg, timestamp=datetime.now()))
                 print(self._fifo_mem._message_queue[-1][0])
 
-
-if __name__ == "__main__":
-    agent = ReActBrowserAgent()
-    while True:
-        agent.reset()
-        print("Please enter your objective (type `exit` to exit): ")
-        objective = input("> ")
-        if objective == "exit":
-            break
-        agent.run(objective)
-        input("Press enter to continue...")
     
