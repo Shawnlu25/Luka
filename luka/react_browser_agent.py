@@ -229,6 +229,7 @@ class ReActBrowserAgent:
                 self._fifo_mem.insert(msg)
                 print(msg)
             else:
+                # TODO: return the final message
                 msg = Message(role="agent", content=browser_msg, timestamp=datetime.now())
                 self._fifo_mem.insert(msg)
                 print(msg)
