@@ -46,22 +46,25 @@ You can issue these commands:
 	TYPESUBMIT <ID> <TEXT> - same as TYPE above, except then it presses ENTER to submit the form
     BACK - go back to the previous page
     FORWARD - go forward to the next page
-    COMPLETE - indicate that you have completed the objective
+    COMPLETE <TEXT> - indicate that you have completed the objective and provide any comments in <TEXT>
 
-Based on your given objective, issue whatever command you believe will get you closest to 
-achieving your goal. Your reply consists of one rationale in text followed by a command. 
-The rationale and command will be added to the history of interactions for your reference at future 
-steps. The rationale should be kept concise, less than 30 words, and must be consistent with the
-previous interactions. Avoid repeating the same attempts and find a workaround if you encounter a 
-problem. 
-    
-You start on about:blank, but you can visit any site directly. Usually you should start on 
-google.com and search from there. Don't try to interact with elements that you can't see. If you 
-encounter an error or an effectless command, avoid repeating the same command, try something else 
-to achieve the goal. 
+IMPORTANT: Based on your given objective, you must first provide a rationale in text for the next
+action, then issue any command that you beleive will get you closer to achieving the goal. The rationale 
+and command will be added to the history of interactions for your reference at future steps. The 
+rationale should be kept concise, less than 30 words, and must be a natural continuation of previous 
+interactions.
+
+Note: 
+* You start on about:blank, but you can visit any site directly. Usually you should start on 
+  google.com and search from there. Don't try to interact with elements that you can't see. 
+* You must make appropriate adjustment if the user provides additional information, changes the objective,
+or specifies a concrete way of achieving the goal.
+* If you believe you have reached the objective, issue a `COMPLETE` command with any additional comments.
+* If you encounter an exception, an effectless command, or find yourself in a loop, avoid repeating the 
+same command and try something else to achieve the goal.
 
 The current browser content, history of interactions, and objective follow. 
-Reply with your next command to the browser.
+Reply with your rationale and issue the next command to the browser.
 """
 
 USER_PROMPT = """
@@ -139,7 +142,7 @@ class ReActBrowserAgent:
         exception_msg = None
 
         if command[0] == "COMPLETE":
-            return True, None
+            return True, " ".join(command[1:])
         elif command[0] == "VISIT":
             try:
                 url = command[1]
@@ -212,13 +215,22 @@ class ReActBrowserAgent:
                 response_model=_AgentReply,
             )
             # TODO: replace print statements with logging
-            self._fifo_mem.insert(Message(role="agent", content=reply.rationale, timestamp=datetime.now()))
-            print(self._fifo_mem._message_queue[-1][0])
-            self._fifo_mem.insert(Message(role="agent", content=reply.command, timestamp=datetime.now()))
-            print(self._fifo_mem._message_queue[-1][0])
+            msg = Message(role="agent", content=reply.rationale, timestamp=datetime.now())
+            self._fifo_mem.insert(msg)
+            print(msg)
+
+            msg = Message(role="agent", content=reply.command, timestamp=datetime.now())
+            self._fifo_mem.insert(msg)
+            print(msg)
+
             completed, browser_msg = self._act(reply.command)
             if not completed:
-                self._fifo_mem.insert(Message(role="chrome", content=browser_msg, timestamp=datetime.now()))
-                print(self._fifo_mem._message_queue[-1][0])
+                msg = Message(role="chrome", content=browser_msg, timestamp=datetime.now())
+                self._fifo_mem.insert(msg)
+                print(msg)
+            else:
+                msg = Message(role="agent", content=browser_msg, timestamp=datetime.now())
+                self._fifo_mem.insert(msg)
+                print(msg)
 
     
