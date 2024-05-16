@@ -1,9 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import Tuple, Optional
+from typing import Tuple, List, Optional
 
-from litellm import completion, encode
 import instructor
 import os
+from litellm import completion, encode
+from termcolor import colored
 from datetime import datetime
 
 from luka.envs import SeleniumSandbox
@@ -46,6 +47,8 @@ You can issue these commands:
 	TYPESUBMIT <ID> <TEXT> - same as TYPE above, except then it presses ENTER to submit the form
     BACK - go back to the previous page
     FORWARD - go forward to the next page
+    YIELD <TEXT> - yield control to user with a message in <TEXT>;
+    ASK <TEXT> - ask the user a question in <TEXT>; 
     COMPLETE <TEXT> - indicate that you have completed the objective and provide any comments in <TEXT>
 
 IMPORTANT: Based on your given objective, you must first provide a rationale in text for the next
@@ -58,16 +61,21 @@ Note:
 * You start on about:blank, but you can visit any site directly. Usually you should start on 
   google.com and search from there. Don't try to interact with elements that you can't see. 
 * You must make appropriate adjustment if the user provides additional information, changes the objective,
-or specifies a concrete way of achieving the goal.
+  or specifies a concrete way of achieving the goal.
 * If you believe you have reached the objective, issue a `COMPLETE` command with any additional comments.
+* If you encounter a CAPTCHA, username/email/password input, or any other user-specific interaction, 
+  issue a `YIELD` command. Avoid creating accounts or entering personal information unless told to do so.
+  Only issue `YIELD` command when you encounter `I cannot possibly proceed without your help` situation.
+* If you need clarification or want to present the user with choices, issue an `ASK` command. Basically, 
+  only invoke `ASK` command when you encounter `How should I proceed?` situation.
 * If you encounter an exception, an effectless command, or find yourself in a loop, avoid repeating the 
-same command and try something else to achieve the goal.
+  same command and try something else to achieve the goal.
 
 The current browser content, history of interactions, and objective follow. 
 Reply with your rationale and issue the next command to the browser.
 """
 
-USER_PROMPT = """
+USER_PROMPT = """ 
 ------------------
 CURRENT BROWSER CONTENT:
 $dom
@@ -133,7 +141,13 @@ class ReActBrowserAgent:
         self._sandbox.reset()
         self._fifo_mem.reset()
 
-    def _act(self, command:str) -> Tuple[bool, Optional[str]]:
+    def _get_feedback(self, msg:str) -> str:
+        print(colored("agent: "), colored(msg, "light_green"))
+        feedback = input(colored("> ", "light_blue"))
+        return feedback
+
+
+    def _act(self, command:str) -> Tuple[bool, Optional[Message]]:
         """
         Execute a command on the browser sandbox
         Returns a tuple of (completed, msg)
@@ -141,9 +155,16 @@ class ReActBrowserAgent:
         command = command.split(" ")
         exception_msg = None
 
+        # User interaction commands
         if command[0] == "COMPLETE":
-            return True, " ".join(command[1:])
-        elif command[0] == "VISIT":
+            return True, [Message(role="agent", content=" ".join(command[1:]), timestamp=datetime.now())]
+        elif command[0] == "YIELD" or command[0] == "ASK":
+            msgs = [Message(role="agent", content=" ".join(command[1:]), timestamp=datetime.now()),
+                    Message(role="user", content=self._get_feedback(" ".join(command[1:])), timestamp=datetime.now())]
+            return False, msgs
+
+        # Browser-related commands
+        if command[0] == "VISIT":
             try:
                 url = command[1]
                 self._sandbox.visit(url)
@@ -186,8 +207,8 @@ class ReActBrowserAgent:
         info_str = f"Current url: {current_url}\nCurrent scroll position: {scroll_percentage}% (scroll-y={scroll_y}, scroll-height={scroll_height})"
 
         if exception_msg is not None:
-            return False, f"Action unsuccessful, an exception occured: {exception_msg}\n" + info_str
-        return False, "Action successful!\n" + info_str
+            return False, [Message(role="browser", content=f"Action unsuccessful, an exception occured: {exception_msg}\n" + info_str, timestamp=datetime.now())]
+        return False, [Message(role="browser", content="Action successful!\n" + info_str, timestamp=datetime.now())]
     
     def run(self, objective, bg_info=None):
         self._fifo_mem.insert(Message(role="user", content=objective, timestamp=datetime.now()))
@@ -223,15 +244,9 @@ class ReActBrowserAgent:
             self._fifo_mem.insert(msg)
             print(msg)
 
-            completed, browser_msg = self._act(reply.command)
-            if not completed:
-                msg = Message(role="chrome", content=browser_msg, timestamp=datetime.now())
-                self._fifo_mem.insert(msg)
-                print(msg)
-            else:
-                # TODO: return the final message
-                msg = Message(role="agent", content=browser_msg, timestamp=datetime.now())
-                self._fifo_mem.insert(msg)
-                print(msg)
+            completed, browser_msgs = self._act(reply.command)
+            for browser_msg in browser_msgs:
+                self._fifo_mem.insert(browser_msg)
+                print(browser_msg)
 
     
