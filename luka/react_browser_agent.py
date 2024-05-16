@@ -91,7 +91,7 @@ class ReActBrowserAgent:
     def __init__(self):
         self._sandbox = SeleniumSandbox()
 
-        self._model = "gpt-4-turbo"
+        self._model = "gpt-4o"
         self._openai_key = os.getenv("OPENAI_API_KEY")
         self._client = instructor.from_litellm(completion)
         
