@@ -9,4 +9,5 @@ if __name__ == "__main__":
         if objective == "exit":
             break
         agent.run(objective)
+        print(agent._txt_mem)
         input("Press enter to continue...")

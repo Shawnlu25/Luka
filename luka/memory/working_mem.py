@@ -112,7 +112,7 @@ class TextEditorMemory(WorkingMemory):
         wrapper = textwrap.TextWrapper(subsequent_indent='\t', width=80)
         for i, line in enumerate(self._lines, start=1):
             line_num = str(i).rjust(num_width)  # Right-align line numbers
-            result += wrapper.fill(f"{line_num}: {line[0]}") + "\n"
+            result += wrapper.fill(f"{line_num}| {line[0]}") + "\n"
         
         return result
         

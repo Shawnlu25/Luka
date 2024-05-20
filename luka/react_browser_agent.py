@@ -8,7 +8,7 @@ from termcolor import colored
 from datetime import datetime
 
 from luka.envs import SeleniumSandbox
-from luka.memory import FIFOConversationMemory
+from luka.memory import FIFOConversationMemory, TextEditorMemory
 from luka.utils import Message
 
 
@@ -18,6 +18,7 @@ You are an agent controlling a browser. You are given:
 	(1) an objective that you are trying to achieve
 	(2) a simplified DOM of what's visible in the browser window (more on that below)
     (3) a history of previous interactions that lead you to the current state
+    (4) a blank txt file that you can edit and read from, useful for storing information
 
 The format of the browser content is highly simplified; all formatting elements are stripped.
 Interactive elements such as links, inputs are represented like this:
@@ -37,6 +38,12 @@ errors occurred. e.g.:
                                   Current page: www.amazon.com
                                   Current scroll position: 0% (scroll-y=0, scroll-height=2094)
 
+The txt file is a text file that you can edit and read from. Each line is numbered, and you can
+refer to the line number to perform actions on the file such as insert and replace. The file 
+will be provided to you in the subsequent steps. Use it to store important information that helps
+you achieve the objective, e.g., if the user asks you to collect some information that requires
+multiple steps to gather, the file can be useful to store intermediate results.                                  
+
 You can issue these commands:
 
     Browser commands:
@@ -49,8 +56,9 @@ You can issue these commands:
     BACK - go back to the previous page
     FORWARD - go forward to the next page
 
-    Markdown file edit commands:
-    APPEND <TEXT> - append <TEXT> to the end of the file
+    Txt file edit commands:
+    TINSERT <LINE_NO> <TEXT> - insert text at the specified line number
+    TREPLACE <FROM_LINE_NO> <TO_LINE_NO> <TEXT> - replace existing text from the range with new text
 
     User interaction commands:
     YIELD <TEXT> - yield control to user with a message in <TEXT>;
@@ -69,6 +77,8 @@ Note:
 * You must make appropriate adjustment if the user provides additional information, changes the objective,
   or specifies a concrete way of achieving the goal.
 * If you believe you have reached the objective, issue a `COMPLETE` command with any additional comments.
+  Note that the txt file will be provided to the user at the end of the session. So you can store anything
+  that you think is important for the user to know in the txt file.
 * If you encounter a CAPTCHA, sign-in with username/email/password, or any other user-specific interaction, 
   issue a `YIELD` command. Avoid creating accounts or entering personal information unless told to do so.
   Only issue `YIELD` command when you encounter `I cannot possibly proceed without your help` situation.
@@ -78,6 +88,9 @@ Note:
   a website, choosing a product to buy, clairfying the objective, etc.
 * If you encounter an exception, an effectless command, or find yourself in a loop, avoid repeating the 
   same command and try something else to achieve the goal.
+* When you are exploring a website in order to gather information, you must issue `TINSERT` or `TREPLACE`
+  commands to edit the txt file in order to store the information you have gathered.
+* Avoid unnecessary `TREPLACE` commands. Only use it when you are editing existing information.
 
 The current browser content, history of interactions, and objective follow. 
 Reply with your rationale and issue the next command to the browser.
@@ -90,6 +103,9 @@ $dom
 ------------------
 HISTORY:
 $history
+------------------
+TXT FILE:
+$txt_file
 ------------------
 OBJECTIVE:
 $objective
@@ -145,10 +161,12 @@ class ReActBrowserAgent:
             trigger_threshold=0.8, 
             target_threshold=0.5
         )
+        self._txt_mem = TextEditorMemory(tokenize=litellm_tokenize, max_size=1024)
     
     def reset(self):
         self._sandbox.reset()
         self._fifo_mem.reset()
+        self._txt_mem.reset()
 
     def _get_feedback(self, msg:str) -> str:
         print(colored("agent: ", "light_green", attrs=["bold"]), colored(msg, "light_green"))
@@ -170,6 +188,21 @@ class ReActBrowserAgent:
             msgs = [Message(role="agent", content=args[0], timestamp=datetime.now()),
                     Message(role="user", content=self._get_feedback(args[0]), timestamp=datetime.now())]
             return False, msgs
+
+        if command == "TINSERT":
+            try:
+                self._txt_mem.insert(args[1], int(args[0]))
+                return False, [Message(role="txt", content=f"Text inserted at line {args[0]}", timestamp=datetime.now())]
+            except Exception as e:
+                exception_msg = str(e)
+                return False, [Message(role="txt", content=f"Action unsuccessful, an exception occured: {exception_msg}", timestamp=datetime.now())]
+        elif command == "TREPLACE":
+            try:
+                self._txt_mem.replace(args[2], (int(args[0]), int(args[1])))
+                return False, [Message(role="txt", content=f"Text replaced from line {args[0]} to line {args[1]}", timestamp=datetime.now())]
+            except Exception as e:
+                exception_msg = str(e)
+                return False, [Message(role="txt", content=f"Action unsuccessful, an exception occured: {exception_msg}", timestamp=datetime.now())]
 
         # Browser-related commands
         if command == "VISIT":
@@ -227,7 +260,7 @@ class ReActBrowserAgent:
             if dom is None:
                 dom = "[empty page]"
             history = str(self._fifo_mem)
-            user_prompt = USER_PROMPT.replace("$dom", dom).replace("$history", history).replace("$objective", objective)
+            user_prompt = USER_PROMPT.replace("$dom", dom).replace("$history", history).replace("$objective", objective).replace("$txt_file", str(self._txt_mem))
 
             reply = self._client.chat.completions.create(
                 model=self._model,
