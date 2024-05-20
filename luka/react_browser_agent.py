@@ -49,6 +49,9 @@ You can issue these commands:
     BACK - go back to the previous page
     FORWARD - go forward to the next page
 
+    Markdown file edit commands:
+    APPEND <TEXT> - append <TEXT> to the end of the file
+
     User interaction commands:
     YIELD <TEXT> - yield control to user with a message in <TEXT>;
     ASK <TEXT> - ask the user a question in <TEXT>; 

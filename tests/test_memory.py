@@ -2,6 +2,7 @@ import pytest
 
 from luka.memory.recall_mem import TransientRecallMemory
 from luka.memory.working_mem import FIFOConversationMemory
+from luka.memory.working_mem import TextEditorMemory
 from luka.utils import Message
 from datetime import datetime
 
@@ -20,6 +21,12 @@ def fifo_mem():
         return _SUMMARY
 
     return FIFOConversationMemory(tokenize=dummy_tokenize, summarize=dummy_summarize, max_size=30, trigger_threshold=0.8, target_threshold=0.5)
+
+@pytest.fixture(scope="module")
+def text_mem():
+    def dummy_tokenize(x):
+        return x.split(" ")
+    return TextEditorMemory(tokenize=dummy_tokenize)
 
 
 def test_transient_recall_memory_insert(transient_mem):
@@ -72,7 +79,7 @@ def test_transient_recall_memory_date_search(transient_mem):
     transient_mem.reset()
     assert len(transient_mem) == 0, "TransientRecallMemory should have 0 messages"
 
-def test_fifo_conversation_memory_insert(fifo_mem):
+def test_fifo_conversation_memory(fifo_mem):
     fifo_mem.insert(Message(role="user", content="Lorem ipsum dolor sit amet, consectetur adipiscing elit.", timestamp=datetime(2024, 5, 1, 15, 30, 0)))
     messages = fifo_mem._message_queue
     assert len(messages) == 1, "FIFOConversationMemory: message queue should have 1 message"
@@ -90,6 +97,22 @@ def test_fifo_conversation_memory_insert(fifo_mem):
     assert messages[0][0].content == _SUMMARY, "FIFOConversationMemory: first message should be a summary"
     assert messages[1][0].content == "Ut enim ad minim veniam", "FIFOConversationMemory: second message should be the latest inserted message"
 
+    fifo_mem.replace(Message(role="user", content="Vale.", timestamp=datetime(2024, 5, 1, 15, 30, 20)), 1)
+    messages = fifo_mem._message_queue
+    assert len(messages) == 2, "FIFOConversationMemory: message queue should have 2 messages"
+    assert messages[0][0].content == _SUMMARY, "FIFOConversationMemory: first message should be a summary"
+    assert messages[1][0].content == "Vale.", "FIFOConversationMemory: second message should be the latest inserted message"
+
     assert str(fifo_mem)
     fifo_mem.reset()
     assert len(fifo_mem._message_queue) == 0, "FIFOConversationMemory: message queue should be empty after reset"
+
+def test_text_editor_memory(text_mem):
+    text_mem.insert("Lorem ipsum dolor sit amet, consectetur adipiscing elit.", -1)
+    text_mem.insert("Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", 0)
+    printed = text_mem.__repr__()
+    assert printed == "1: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n2: Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n", "TextEditorMemory: printed text should have line numbers"
+
+    text_mem.replace("Ut enim ad minim veniam\nLorem ipsum dolor sit amet, consectetur adipiscing elit.\n    aliquip ex ea commodo consequat.", (-2,0))
+    printed = text_mem.__repr__()
+    assert printed == "1: Ut enim ad minim veniam\n2: Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n3: aliquip ex ea commodo consequat.\n", "TextEditorMemory: replaced string should have 3 lines"
