@@ -39,6 +39,7 @@ errors occurred. e.g.:
 
 You can issue these commands:
 
+    Browser commands:
     VISIT <URL> - visit a new URL
 	SUP - scroll up one page
 	SDOWN - scroll down one page
@@ -47,6 +48,8 @@ You can issue these commands:
 	TYPESUBMIT <ID> <TEXT> - same as TYPE above, except then it presses ENTER to submit the form
     BACK - go back to the previous page
     FORWARD - go forward to the next page
+
+    User interaction commands:
     YIELD <TEXT> - yield control to user with a message in <TEXT>;
     ASK <TEXT> - ask the user a question in <TEXT>; 
     COMPLETE <TEXT> - indicate that you have completed the objective and provide any comments in <TEXT>
@@ -63,11 +66,13 @@ Note:
 * You must make appropriate adjustment if the user provides additional information, changes the objective,
   or specifies a concrete way of achieving the goal.
 * If you believe you have reached the objective, issue a `COMPLETE` command with any additional comments.
-* If you encounter a CAPTCHA, username/email/password input, or any other user-specific interaction, 
+* If you encounter a CAPTCHA, sign-in with username/email/password, or any other user-specific interaction, 
   issue a `YIELD` command. Avoid creating accounts or entering personal information unless told to do so.
   Only issue `YIELD` command when you encounter `I cannot possibly proceed without your help` situation.
+* Avoid entering made-up information, especially when asked for personal information.
 * If you need clarification or want to present the user with choices, issue an `ASK` command. Basically, 
-  only invoke `ASK` command when you encounter `How should I proceed?` situation.
+  only invoke `ASK` command when you encounter `How should I proceed?` situation, e.g., signing up for
+  a website, choosing a product to buy, clairfying the objective, etc.
 * If you encounter an exception, an effectless command, or find yourself in a loop, avoid repeating the 
   same command and try something else to achieve the goal.
 
@@ -91,7 +96,8 @@ YOUR COMMAND:
 
 class _AgentReply(BaseModel):
     rationale: str = Field(..., description="The rationale behind the command")
-    command: str = Field(..., description="The command to execute")
+    command: str = Field(..., description="The command to execute, e.g., VISIT, CLICK, COMPLETE, etc.")
+    args: List[str] = Field([], description="Arguments for the command, e.g., URL, ID, TEXT, etc. If no arguments are needed, this field is empty list. TEXT arguments should not be split into separate words.")
 
 
 class ReActBrowserAgent:
@@ -142,59 +148,58 @@ class ReActBrowserAgent:
         self._fifo_mem.reset()
 
     def _get_feedback(self, msg:str) -> str:
-        print(colored("agent: "), colored(msg, "light_green"))
-        feedback = input(colored("> ", "light_blue"))
+        print(colored("agent: ", "light_green", attrs=["bold"]), colored(msg, "light_green"))
+        feedback = input(colored("> ", "light_blue", attrs=["bold"]))
         return feedback
 
 
-    def _act(self, command:str) -> Tuple[bool, Optional[Message]]:
+    def _act(self, command:str, args:List[str]) -> Tuple[bool, Optional[Message]]:
         """
         Execute a command on the browser sandbox
         Returns a tuple of (completed, msg)
         """
-        command = command.split(" ")
         exception_msg = None
 
         # User interaction commands
-        if command[0] == "COMPLETE":
-            return True, [Message(role="agent", content=" ".join(command[1:]), timestamp=datetime.now())]
-        elif command[0] == "YIELD" or command[0] == "ASK":
-            msgs = [Message(role="agent", content=" ".join(command[1:]), timestamp=datetime.now()),
-                    Message(role="user", content=self._get_feedback(" ".join(command[1:])), timestamp=datetime.now())]
+        if command == "COMPLETE":
+            return True, [Message(role="agent", content=args[0], timestamp=datetime.now())]
+        elif command == "YIELD" or command == "ASK":
+            msgs = [Message(role="agent", content=args[0], timestamp=datetime.now()),
+                    Message(role="user", content=self._get_feedback(args[0]), timestamp=datetime.now())]
             return False, msgs
 
         # Browser-related commands
-        if command[0] == "VISIT":
+        if command == "VISIT":
             try:
-                url = command[1]
+                url = args[0]
                 self._sandbox.visit(url)
             except Exception as e:
                 exception_msg = str(e)
-        elif command[0] == "SUP":
+        elif command == "SUP":
             self._sandbox.scroll(scroll_down=False)
-        elif command[0] == "SDOWN":
+        elif command == "SDOWN":
             self._sandbox.scroll()
-        elif command[0] == "CLICK":
+        elif command == "CLICK":
             try:
-                index = int(command[1])
+                index = int(args[0])
                 self._sandbox.click(index)
             except Exception as e:
                 exception_msg = str(e)
-        elif command[0] == "TYPE":
+        elif command == "TYPE":
             try:
-                index = int(command[1])
-                text = " ".join(command[2:])
+                index = int(args[0])
+                text = args[1]
                 self._sandbox.type(index, text)
             except Exception as e:
                 exception_msg = str(e)
-        elif command[0] == "TYPESUBMIT":
+        elif command == "TYPESUBMIT":
             try:
-                index = int(command[1])
-                text = " ".join(command[2:])
+                index = int(args[0])
+                text = args[1]
                 self._sandbox.type(index, text, enter=True)
             except Exception as e:
                 exception_msg = str(e)
-        elif command[0] == "BACK":
+        elif command == "BACK":
             self._sandbox.go_back()
         elif command == "FORWARD":
             self._sandbox.go_forward()
@@ -240,11 +245,12 @@ class ReActBrowserAgent:
             self._fifo_mem.insert(msg)
             print(msg)
 
-            msg = Message(role="agent", content=reply.command, timestamp=datetime.now())
+            command_content = f"{reply.command} {' '.join(reply.args)}"
+            msg = Message(role="agent", content=command_content, timestamp=datetime.now())
             self._fifo_mem.insert(msg)
             print(msg)
 
-            completed, browser_msgs = self._act(reply.command)
+            completed, browser_msgs = self._act(reply.command, reply.args)
             for browser_msg in browser_msgs:
                 self._fifo_mem.insert(browser_msg)
                 print(browser_msg)
