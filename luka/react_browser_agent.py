@@ -31,7 +31,7 @@ the browser's responses. It might also contain sporadic messages from the user. 
 responses never contain the actual DOM, but only give you a high-level description or any 
 errors occurred. e.g.:
 
-    [2024-05-01 15:30:00] user:   Buy me a box of clips on Amazon
+    [2024-05-01 15:30:00] user:   Buy me a box of paperclips on Amazon
     [2024-05-01 15:35:00] agent:  First, I need to get to the Amazon website.
     [2024-05-01 15:35:30] agent:  VISIT www.amazon.com
     [2024-05-01 15:35:30] chrome: Success. 
