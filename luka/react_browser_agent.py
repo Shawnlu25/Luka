@@ -7,7 +7,7 @@ from litellm import completion, encode
 from termcolor import colored
 from datetime import datetime
 
-from luka.envs import SeleniumSandbox
+from luka.tools import SeleniumSandbox
 from luka.memory import FIFOConversationMemory, TextEditorMemory
 from luka.utils import Message
 
@@ -259,6 +259,7 @@ class ReActBrowserAgent:
             dom = self._sandbox.simplify_web_elements()
             if dom is None:
                 dom = "[empty page]"
+            print(dom)
             history = str(self._fifo_mem)
             user_prompt = USER_PROMPT.replace("$dom", dom).replace("$history", history).replace("$objective", objective).replace("$txt_file", str(self._txt_mem))
 
