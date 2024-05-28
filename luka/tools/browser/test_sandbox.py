@@ -24,6 +24,8 @@ class SeleniumSandbox(object):
             self._js_script = f.read()
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dump_aria.js'), "r") as f:
             self._aria_script = f.read()
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pure_text.js'), "r") as f:
+            self._pt_script = f.read()
 
     @property
     def current_url(self):
@@ -110,6 +112,10 @@ class SeleniumSandbox(object):
 
     def dump_aria(self):
         result = self._driver.execute_script(self._aria_script)
+        return result
+
+    def pure_text(self):
+        result = self._driver.execute_script(self._pt_script)
         return result
 
     def retrieve_elements(self):
@@ -203,9 +209,8 @@ if __name__ == "__main__":
     html_text_converter.body_width = 0
 
     while True:
-        sandbox.retrieve_elements()
         print(sandbox.simplify_web_elements())
-        print(sandbox.dump_aria())
+        #print(sandbox.pure_text())
         #print(html_text_converter.handle(sandbox._driver.page_source))
         #for x in sandbox.page_elements:
         #    print(x)
