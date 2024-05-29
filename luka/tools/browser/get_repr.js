@@ -28,11 +28,6 @@ const appendElement = (el_list, el) => {
         console.log("append text with text")
         el_list[el_list.length - 1].text += el.text;
         el_list[el_list.length - 1].element = el.element;
-        /^\s/.test(el_list[el_list.length - 1].text) ? prefix = " " : prefix = "";
-        /^\n/.test(el_list[el_list.length - 1].text) ? prefix = "\n" : prefix = "";
-        /\s$/.test(el_list[el_list.length - 1].text) ? postfix = " " : postfix = "";
-        /\n$/.test(el_list[el_list.length - 1].text) ? postfix = "\n" : postfix = "";
-        el_list[el_list.length - 1].text = prefix + el_list[el_list.length - 1].text.trim() + postfix;
     } else {
         el_list.push(el);
     }
@@ -43,26 +38,15 @@ const prependElement = (el_list, el) => {
         console.log("prepend text with text")
         el_list[0].text = el.text + el_list[0].text;
         el_list[0].element = el.element;
-        /^\s/.test(el_list[0].text) ? prefix = " " : prefix = "";
-        /^\n/.test(el_list[0].text) ? prefix = "\n" : prefix = "";
-        /\s$/.test(el_list[0].text) ? postfix = " " : postfix = "";
-        /\n$/.test(el_list[0].text) ? postfix = "\n" : postfix = "";
-        el_list[0].text = prefix + el_list[0].text.trim() + postfix;
     } else {
         el_list.unshift(el);
     }
 }
 
-const getTextFromList = (el_list) => {
-    // filter out text == null
-    return el_list.filter(el => el.text != null).map(el => el.text).join("");
-}
-
-const transformElement = (element, tag, text) => {
-    return {
+const getRepresentationOfElement = (element, tag, content) => {
+    var obj = {
         element: element,
         tag: tag,
-        text: text,
         name: element.getAttribute('name'),
         type: element.getAttribute('type'),
         placeholder: element.getAttribute('placeholder'),
@@ -75,12 +59,19 @@ const transformElement = (element, tag, text) => {
         min: element.getAttribute('min'),
         max: element.getAttribute('max'),
     }
+    if (typeof content === "string") {
+        obj.text = content;
+        obj.children = null;
+    } else if (Array.isArray(content)) {
+        obj.text = null;
+        obj.children = content;
+    } 
+    return obj;
 }
 
 const getDOMRepresentation = (element) => {
     // content: TAGS_CONTENT
     // structure: TAGS_FORMAT, TAGS_BASIC
-    // interactive: TAGS_LINKS, TAGS_FORM, TAGS_IMAGES, TAGS_AV
 
     if (element.hasAttribute("llm-dom-skip")) {
         return [];
@@ -96,7 +87,8 @@ const getDOMRepresentation = (element) => {
     }
 
     // Skip invisible elements
-    if (!element.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty:true})) {
+    if (!element.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty:true}) && !element.matches("option"))  {
+
         Array.from(element.querySelectorAll("*")).forEach(el => {
             el.setAttribute("llm-dom-skip", "true");
         });
@@ -112,7 +104,7 @@ const getDOMRepresentation = (element) => {
             postfix = "";
             /\s$/.test(child.nodeValue) ? postfix = " " : postfix = "";
             /\n$/.test(child.nodeValue) ? postfix = "\n" : postfix = "";
-            appendElement(el_list, transformElement(element, "text", child.nodeValue.trim() + postfix));
+            appendElement(el_list, getRepresentationOfElement(element, "text", child.nodeValue.trim() + postfix));
         } else if (child.nodeType === Node.ELEMENT_NODE) {
             getDOMRepresentation(child).forEach(el => {
                 appendElement(el_list, el);
@@ -121,32 +113,112 @@ const getDOMRepresentation = (element) => {
     }
 
     // ========================
+    // Forms
+    if (element.matches("textarea, input[type=text], input[type=password], input[type=email], input[type=search], input[type=number], input[type=tel], input[type=url], input[type=search]")) {
+        el_list = [getRepresentationOfElement(element, "textinput", el_list)];   
+        return el_list;
+    }
+
+    if (element.matches("input[type=date], input[type=datetime-local], input[type=month], input[type=week], input[type=time]")) {
+        el_list = [getRepresentationOfElement(element, "datepicker", el_list)];   
+        return el_list;
+    }
+
+    if (element.matches("input[type=button], input[type=submit], div[role=button], span[role=button], input[type=reset]")) {
+        el_list = [getRepresentationOfElement(element, "button", el_list)];
+        return el_list;
+    }
+
+    if (element.matches("select, div[role=combobox]")) {
+        el_list = [getRepresentationOfElement(element, "select", el_list)];
+        return el_list;
+    }
+
+    if (element.matches("optgroup")) {
+        el_list = [getRepresentationOfElement(element, "select", el_list)];
+        return el_list;
+    }
+
+    if (element.matches("option, div[role=option], span[role=option]")) {
+        prependElement(el_list, getRepresentationOfElement(element, "text", "\n* "));
+        return el_list;
+    }
+
+    if (element.matches("input[type=checkbox], div[role=checkbox], span[role=checkbox]")) {
+        el_list = [getRepresentationOfElement(element, "checkbox", el_list)];
+        return el_list;
+    }
+
+    if (element.matches("input[type=radio], div[role=checkbox], span[role=checkbox]")) {
+        el_list = [getRepresentationOfElement(element, "radio", el_list)];
+        return el_list;
+    }
+
+    // range, color, file
+
+    // ========================
+    // Links
+    if (element.matches(TAGS_LINKS)) {
+        if (element.matches("a, link")) {
+            el_list = [getRepresentationOfElement(element, "link", el_list)];
+        }
+        return el_list;
+    }
+
+    // ========================
+    // Images and AV
+    if (element.matches(TAGS_IMAGES) || element.matches(TAGS_AV)) {
+        el_list = [getRepresentationOfElement(element, element.tagName.toLowerCase(), el_list)];
+        return el_list
+    }
+
+     // ========================
+    // Lists
+    if (element.matches(TAGS_LISTS)) {
+        if (element.matches("li")) {
+            prependElement(el_list, getRepresentationOfElement(element, "text", "\n* "));
+        }
+        if (element.matches("menu, ol, ul, dl")) {
+            prependElement(el_list, getRepresentationOfElement(element, "text", "\n"));
+            appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
+        }
+        if (element.matches("dt")) {
+            appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
+        }
+        if (element.matches("dd")) {
+            prependElement(el_list, getRepresentationOfElement(element, "text", "\n\t"));
+        }
+
+        return el_list;
+    }
+
+    // ========================
     // Content Tags
     trimList(el_list);
     
     if (element.matches("hr")) {
-        prependElement(el_list, transformElement(element, "text", "\n------"));
-        appendElement(el_list, transformElement(element, "text", "\n"));
+        prependElement(el_list, getRepresentationOfElement(element, "text", "\n------"));
+        appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
         return el_list;
     }
 
     if (element.matches("br")) {
         if (el_list.length > 0) {
-            prependElement(el_list, transformElement(element, "text", "\n"));
+            prependElement(el_list, getRepresentationOfElement(element, "text", "\n"));
             return el_list;
         }
-        appendElement(el_list, transformElement(element, "text", "\n"));
+        appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
         return el_list;
     }
     if (element.matches("p")) {
-        prependElement(el_list, transformElement(element, "text", "\n"));
-        appendElement(el_list, transformElement(element, "text", "\n"));
+        prependElement(el_list, getRepresentationOfElement(element, "text", "\n"));
+        appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
         return el_list;
     } 
     
     if (element.matches("h1, h2, h3, h4, h5, h6")) {
-        prependElement(el_list, transformElement(element, "text", "\n" + "#".repeat(parseInt(element.nodeName.toLowerCase().replace("h", ""))) + " "));
-        appendElement(el_list, transformElement(element, "text", "\n"));
+        prependElement(el_list, getRepresentationOfElement(element, "text", "\n" + "#".repeat(parseInt(element.nodeName.toLowerCase().replace("h", ""))) + " "));
+        appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
         return el_list;
     }
 
@@ -166,14 +238,14 @@ const getDOMRepresentation = (element) => {
         } else if (element.matches("s, del")) {
             l = r = "~~";
         }
-        prependElement(el_list, transformElement(element, "text", " " + l));
-        appendElement(el_list, transformElement(element, "text", r + " "));
+        prependElement(el_list, getRepresentationOfElement(element, "text", " " + l));
+        appendElement(el_list, getRepresentationOfElement(element, "text", r + " "));
         return el_list;
     } 
     
     if (element.matches(TAGS_FORMAT_BLOCK)) {
-        prependElement(el_list, transformElement(element, "text", "\n```\n"));
-        appendElement(el_list, transformElement(element, "text", "\n```\n"));
+        prependElement(el_list, getRepresentationOfElement(element, "text", "\n```\n"));
+        appendElement(el_list, getRepresentationOfElement(element, "text", "\n```\n"));
         return el_list;
     }
 
@@ -184,27 +256,22 @@ const getDOMRepresentation = (element) => {
             return el_list;
         }
         if (el_list.length > 0) {
-            prependElement(el_list, transformElement(element, "text", "\n"));
-            appendElement(el_list, transformElement(element, "text", "\n"));
+            prependElement(el_list, getRepresentationOfElement(element, "text", "\n"));
+            appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
         }
         return el_list;
     }
 
     // ========================
-    // Links
-    if (element.matches(TAGS_LINKS)) {
-        if (element.matches("a, link")) {
-            el_list = [transformElement(element, "link", getTextFromList(el_list))];
-        }
-        return el_list;
-    }
+    // Tables
+    // TODO: Implement table representation
 
     // ========================
     // Default
     if (el_list.length == 0) {
         return el_list;
     }
-    appendElement(el_list, transformElement(element, "text", "\n"));
+    appendElement(el_list, getRepresentationOfElement(element, "text", "\n"));
     return el_list;
 }
 

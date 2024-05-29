@@ -7,9 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 import html2text
 import atexit
-import validators
 import os
-import re
 
 class SeleniumSandbox(object):
     def __init__(self, window_size=(1024, 768)):
@@ -21,10 +19,6 @@ class SeleniumSandbox(object):
         self._elements = []
         atexit.register(self.cleanup)
 
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'retrieve_elements.js'), "r") as f:
-            self._js_script = f.read()
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dump_aria.js'), "r") as f:
-            self._aria_script = f.read()
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'get_repr.js'), "r") as f:
             self._repr_script = f.read()
 
@@ -52,29 +46,34 @@ class SeleniumSandbox(object):
     def cleanup(self):
         self._driver.quit()
 
-    def simplify_web_elements(self):
-        # TODO: turn retrieve_elements into a decorator
-        self.retrieve_elements_3()
-        
-        elements = self.page_elements
+    def simplifed_dom(self):
+        self.retrieve_elements()
+        return self._simplify_web_elements(self.page_elements)
+
+    def _simplify_web_elements(self, elements):
         simplified_dom = ""
         for e in elements:
-            if e["tag"] == "input":
+            if e["tag"] in ["textinput", "select", "datepicker"]:
                 text_attrs = ["text", "placeholder"]
-                meta_attrs = ["type", "alt", "title", "aria_label", "value"]
-            elif e["tag"] == "link":
-                text_attrs = ["text", "aria_label", "title"]
-                meta_attrs = ["type", "alt"]
-            else:
+                meta_attrs = ["type", "alt", "title", "aria_label", "value", "required", "checked", "min", "max"]
+            elif e["tag"] == "text":
                 text_attrs = ["text"]
                 meta_attrs = []
+            else:
+                text_attrs = ["text", "aria_label", "alt"]
+                meta_attrs = ["type", "value"]
 
             text = [x for x in filter(lambda x: x is not None and len(x) > 0, [e[attr] for attr in text_attrs])]
             text = text[0] if len(text) > 0 else None
             if text != None and text != e["text"]:
                 text = "(" + text + ")"
+            
+            if e["children"] != None:
+                text = "" if text == None else text
+                text = self._simplify_web_elements(e["children"]) + text
+            
             if text == None:
-                text = " "
+                text = ""
             
             meta_str = " ".join([attr + "=\"" + e[attr] + "\"" for attr in meta_attrs if e[attr] is not None])
             if len(meta_str) > 0:
@@ -83,13 +82,9 @@ class SeleniumSandbox(object):
             if e["tag"] == "text":
                 simplified_dom += text
                 continue
-
-            #if e["tag"] == "link":
-            #    # if text has [] or () we need to escape them
-            #    if "[" in text or "]" in text or "(" in text or ")" in text:
-            #        text = re.escape(text)
-            #    simplified_dom += f"[{text}](id=\"{e["id"]}\"{meta_str})"
-            #    continue
+            if e["tag"] in ["img", "map", "area", "canvas", "figcaption", "figure", "picture", "svg"]:
+                simplified_dom += f"![{e['tag']}]({text})"
+                continue
             
             if text is None: 
                 simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}/>\n"
@@ -98,42 +93,22 @@ class SeleniumSandbox(object):
                 simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>\n{text}\n</{e["tag"]}>\n"
             else:
                 simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>{text}</{e["tag"]}>\n"
+        
         return simplified_dom
 
-    
-    
-    def get_text_content(self):
-        script = """
-            return Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, label'))
-                .filter(el => 
-                    Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '')
-                ).map(
-                    el => {
-                        const textContent = Array.from(el.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.nodeValue.trim()).join(' ');
-                        return {
-                            element: el,
-                            tag: "text",
-                            text: textContent
-                        }
-                    }
-                );
-        """
-        elements = self._driver.execute_script(script)
-        texts = [e["text"] for e in elements]
-        return texts
-
-    def retrieve_elements_2(self):
-        elements = self._driver.execute_script(self._js_script)
-        for idx, e in enumerate(elements):
-            e["id"] = idx
-        self._elements = elements
-
-    def retrieve_elements_3(self):
+    def retrieve_elements(self):
         elements = self._driver.execute_script(self._repr_script)
-        for idx, e in enumerate(elements):
-            if e["tag"] != "text":
+
+        idx = 0
+        def assign_idx(elements):
+            nonlocal idx
+            for e in elements:
                 e["id"] = idx
-            print(e["tag"], repr(e["text"]))
+                idx += 1
+                if e["children"] != None:
+                    assign_idx(e["children"])
+
+        assign_idx(elements)
         self._elements = elements
             
 
@@ -146,7 +121,7 @@ if __name__ == "__main__":
     html_text_converter.body_width = 0
 
     while True:
-        print(sandbox.simplify_web_elements())
+        print(sandbox.simplifed_dom())
         print(sandbox.current_url)
         print(sandbox.scroll_progress)
         command = input("> ")
