@@ -9,6 +9,7 @@ import html2text
 import atexit
 import validators
 import os
+import re
 
 class SeleniumSandbox(object):
     def __init__(self, window_size=(1024, 768)):
@@ -24,8 +25,8 @@ class SeleniumSandbox(object):
             self._js_script = f.read()
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dump_aria.js'), "r") as f:
             self._aria_script = f.read()
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pure_text.js'), "r") as f:
-            self._pt_script = f.read()
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'get_repr.js'), "r") as f:
+            self._repr_script = f.read()
 
     @property
     def current_url(self):
@@ -53,13 +54,14 @@ class SeleniumSandbox(object):
 
     def simplify_web_elements(self):
         # TODO: turn retrieve_elements into a decorator
-        self.retrieve_elements_2()
+        self.retrieve_elements_3()
+        
         elements = self.page_elements
         simplified_dom = ""
         for e in elements:
             if e["tag"] == "input":
                 text_attrs = ["text", "placeholder"]
-                meta_attrs = ["type", "alt", "title", "aria_label"]
+                meta_attrs = ["type", "alt", "title", "aria_label", "value"]
             elif e["tag"] == "link":
                 text_attrs = ["text", "aria_label", "title"]
                 meta_attrs = ["type", "alt"]
@@ -71,13 +73,29 @@ class SeleniumSandbox(object):
             text = text[0] if len(text) > 0 else None
             if text != None and text != e["text"]:
                 text = "(" + text + ")"
-
+            if text == None:
+                text = " "
+            
             meta_str = " ".join([attr + "=\"" + e[attr] + "\"" for attr in meta_attrs if e[attr] is not None])
             if len(meta_str) > 0:
                 meta_str = " " + meta_str
 
+            if e["tag"] == "text":
+                simplified_dom += text
+                continue
+
+            #if e["tag"] == "link":
+            #    # if text has [] or () we need to escape them
+            #    if "[" in text or "]" in text or "(" in text or ")" in text:
+            #        text = re.escape(text)
+            #    simplified_dom += f"[{text}](id=\"{e["id"]}\"{meta_str})"
+            #    continue
+            
             if text is None: 
                 simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}/>\n"
+            elif len(text.split("\n")) > 1:
+                text = text.strip()
+                simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>\n{text}\n</{e["tag"]}>\n"
             else:
                 simplified_dom += f"<{e["tag"]} id=\"{e["id"]}\"{meta_str}>{text}</{e["tag"]}>\n"
         return simplified_dom
@@ -110,93 +128,12 @@ class SeleniumSandbox(object):
             e["id"] = idx
         self._elements = elements
 
-    def dump_aria(self):
-        result = self._driver.execute_script(self._aria_script)
-        return result
-
-    def pure_text(self):
-        result = self._driver.execute_script(self._pt_script)
-        return result
-
-    def retrieve_elements(self):
-        script = """
-            // Get clickable elements
-            var clickableElements = Array.from(document.querySelectorAll('a, button, input[type=button], input[type=submit], [role="button"]'))
-                .filter(el => {
-                    const rect = el.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0;
-                    }
-                ).map(
-                    el => ({
-                        element: el,
-                        tag: "link",
-                        text: el.innerText.trim()
-                    })
-                );
-            
-            // Get text input elements
-            const textareas = Array.from(document.querySelectorAll('textarea'));
-            const textInputs = Array.from(document.querySelectorAll(
-                'input[type="text"], input[type="password"], input[type="email"], input[type="search"], input[type="number"], input[type="tel"], input[type="url"]'
-            ));
-            var textInputElements = textareas.concat(textInputs)
-                .filter(el => {
-                    const rect = el.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0;
-                    }
-                ).map(
-                    el => ({
-                        element: el,
-                        tag: "input",
-                        text: el.innerText.trim()
-                    })
-                );
-            
-            // Get readable elements
-            var readableElements = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, label'))
-                .filter(el => {
-                    const rect = el.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-                    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0 && el.textContent.trim().length > 0;
-                })
-                .filter(el => 
-                    Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '')
-                ).map(
-                    el => {
-                        const textContent = Array.from(el.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.nodeValue.trim()).join(' ');
-                        return {
-                            element: el,
-                            tag: "text",
-                            text: textContent
-                        }
-                    }
-                );
-            
-            return clickableElements.concat(textInputElements).concat(readableElements)
-                .map(el => ({
-                    element: el.element,
-                    tag: el.tag,
-                    text: el.text,
-                    x: el.element.getBoundingClientRect().x,
-                    y: el.element.getBoundingClientRect().y,
-                    type: el.element.getAttribute('type'),
-                    placeholder: el.element.getAttribute('placeholder'),
-                    aria_label: el.element.getAttribute('aria-label'),
-                    title: el.element.getAttribute('title'),
-                    alt: el.element.getAttribute('alt')
-                }));
-        """
-        elements = self._driver.execute_script(script)
-        
-        # sort according to y then x element position
-        elements = sorted(elements, key=lambda e: (e["y"], e["x"]))
+    def retrieve_elements_3(self):
+        elements = self._driver.execute_script(self._repr_script)
         for idx, e in enumerate(elements):
-            e["id"] = idx
+            if e["tag"] != "text":
+                e["id"] = idx
+            print(e["tag"], repr(e["text"]))
         self._elements = elements
             
 
@@ -210,10 +147,6 @@ if __name__ == "__main__":
 
     while True:
         print(sandbox.simplify_web_elements())
-        #print(sandbox.pure_text())
-        #print(html_text_converter.handle(sandbox._driver.page_source))
-        #for x in sandbox.page_elements:
-        #    print(x)
         print(sandbox.current_url)
         print(sandbox.scroll_progress)
         command = input("> ")

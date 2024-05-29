@@ -41,8 +41,10 @@ const tagPureTextElements = (element) => {
 
     var result = true;
     var childElements = element.childElements;
-    for (var i = 0; i < childElements.length; i++) {
-        result = result && tagPureTextElements(childElements[i]);
+    if (childElements) {
+        for (var i = 0; i < childElements.length; i++) {
+            result = result && tagPureTextElements(childElements[i]);
+        }
     }
     
     if (!result) {
@@ -136,9 +138,8 @@ const getPureText = (element) => {
 const selectedElements = [];
 
 const selectElement = (element) => {
-    if (element.parentElement && element.parentElement.hasAttribute("luka-skip-element")) {
-        element.setAttribute("luka-skip-element", "true");
-        //return;
+    if (element.parentElement && element.parentElement.hasAttribute("llm-dom-visited")) {
+        element.setAttribute("llm-dom-visited", "true");
     }
     if (!element.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty:true})) {
         return;
@@ -147,54 +148,48 @@ const selectElement = (element) => {
     var tag = null;
     var text = null;
 
-    if (element.matches("iframe")) {
-        //if (element.contentWindow && element.contentWindow.origin === window.origin) {
-        //    element.contentWindow.document.querySelectorAll('*').forEach(selectElement);
-        //}
-    } else if (element.matches("a, link, nav, button, input[type=button], input[type=submit], input[type=reset], [role=\"button\"]")) {
+    if (element.matches("a, link, nav, button, input[type=button], input[type=submit], input[type=reset], [role=\"button\"]")) {
         tag = "link",
-        text = element.innerText.trim();
+        text = getPureText(element).trim();
         if (text && text.length >= 0) {
-            element.setAttribute("luka-skip-element", "true");
+            element.setAttribute("llm-dom-visited", "true");
         }
 
     } else if (element.matches("p, h1, h2, h3, h4, h5, h6, span, div, label, option, ul, li")) {
         if (!Array.from(element.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '')) {
             return;
         }
-        if (element.parentElement && element.parentElement.hasAttribute("luka-skip-element")) {
+        if (element.parentElement && element.parentElement.hasAttribute("llm-dom-visited")) {
             return;
         }
         tag = "text";
-        text = Array.from(element.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.nodeValue.trim()).join(' ')
+        text = getPureText(element);
 
     } else if (element.matches('textarea, input[type=text], input[type=password], input[type=email], input[type=search], input[type=number], input[type=tel], input[type=url], input[type=search]')) {
         tag = "textinput";
-        text = element.innerText.trim();
-        element.setAttribute("luka-skip-element", "true");
+        text = getPureText(element).trim();
+        element.setAttribute("llm-dom-visited", "true");
 
     } else if (element.matches('input[type=checkbox], input[type=radio]')) {
         tag = element.getAttribute('type').toLowerCase();
-        text = element.innerText.trim();
-        element.setAttribute("luka-skip-element", "true");
+        text = getPureText(element).trim();
+        element.setAttribute("llm-dom-visited", "true");
 
     } else if (element.matches('input[type=date], input[type=datetime-local], input[type=month], input[type=week], input[type=time]')) {
         // set tag based on type
         tag = "datepicker";
-        text = element.innerText.trim();
-        element.setAttribute("luka-skip-element", "true");
+        text = getPureText(element).trim();
+        element.setAttribute("llm-dom-visited", "true");
 
     } else if (element.matches('input[type=range]')) {
         tag = "slider";
-        text = element.innerText.trim();
-        element.setAttribute("luka-skip-element", "true");
+        text = getPureText(element).trim();
+        element.setAttribute("llm-dom-visited", "true");
 
     } else if (element.matches('select')) {
         tag = "select";
-        text = element.innerText.trim();
-        element.setAttribute("luka-skip-element", "true");
-
-        // TODO: ???
+        text = getPureText(element).trim();
+        element.setAttribute("llm-dom-visited", "true");
     }
 
     if (!tag) {
@@ -227,6 +222,19 @@ Array.from(document.querySelectorAll('*')).filter(el => {
     const rect = el.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0 && el.textContent.trim().length > 0;
+    return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0;
+}).forEach(tagPureTextElements);
+
+// Select llm-pure-text elements, no matter true or false
+Array.from(document.querySelectorAll('*')).filter(el => {
+    return el.hasAttribute("llm-dom-pure-text");
 }).forEach(selectElement);
+
+// clear all llm-dom-visited, llm-dom-skip, llm-dom-pure-text attributes
+Array.from(document.querySelectorAll('*')).forEach(el => {
+    el.removeAttribute("llm-dom-visited");
+    el.removeAttribute("llm-dom-skip");
+    el.removeAttribute("llm-dom-pure-text");
+});
+
 return selectedElements;
