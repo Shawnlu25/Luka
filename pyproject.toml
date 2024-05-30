@@ -15,8 +15,8 @@ pexpect = "^4.9.0"
 ptyprocess = "^0.7.0"
 instructor = "^1.2.3"
 whoosh = "^2.7.4"
-browsergym = "^0.3.3"
-html2text = "^2024.2.26"
+gymnasium = "^0.29.1"
+matplotlib = "^3.9.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

@@ -14,6 +14,9 @@ const TAGS_SEMANTICS = "style, div, span, header, hgroup, footer, main, section,
 const TAGS_META = "head, meta, base, basefont"
 const TAGS_PROGRAMMING = "script, noscript, applet, embed, object, param";
 
+
+// Useful functions for processing text elements at both end of an element list
+// The point is to merge text elements rather than having multiple text elements in a row
 const trimList = (el_list) => {
     if (el_list.length > 0 && el_list[0].tag == "text") {
         el_list[0].text = el_list[0].text.trimStart();
@@ -69,19 +72,19 @@ const getRepresentationOfElement = (element, tag, content) => {
     return obj;
 }
 
-const getDOMRepresentation = (element) => {
+const retrieveElements = (element) => {
     // content: TAGS_CONTENT
     // structure: TAGS_FORMAT, TAGS_BASIC
 
-    if (element.hasAttribute("llm-dom-skip")) {
+    if (element.hasAttribute("textual-browser-env-skip")) {
         return [];
     }
-    element.setAttribute("llm-dom-skip", "true");
+    element.setAttribute("textual-browser-env-skip", "true");
 
     // Skip meta, programming, and frames tags
     if (element.matches([TAGS_META, TAGS_PROGRAMMING, TAGS_FRAMES, "style"].join(", "))) {
         Array.from(element.querySelectorAll("*")).forEach(el => {
-            el.setAttribute("llm-dom-skip", "true");
+            el.setAttribute("textual-browser-env-skip", "true");
         });
         return [];
     }
@@ -90,7 +93,7 @@ const getDOMRepresentation = (element) => {
     if (!element.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty:true}) && !element.matches("option"))  {
 
         Array.from(element.querySelectorAll("*")).forEach(el => {
-            el.setAttribute("llm-dom-skip", "true");
+            el.setAttribute("textual-browser-env-skip", "true");
         });
         return [];
     }
@@ -106,7 +109,7 @@ const getDOMRepresentation = (element) => {
             /\n$/.test(child.nodeValue) ? postfix = "\n" : postfix = "";
             appendElement(el_list, getRepresentationOfElement(element, "text", child.nodeValue.trim() + postfix));
         } else if (child.nodeType === Node.ELEMENT_NODE) {
-            getDOMRepresentation(child).forEach(el => {
+            retrieveElements(child).forEach(el => {
                 appendElement(el_list, el);
             });
         }
@@ -282,14 +285,14 @@ Array.from(document.querySelectorAll('*')).filter(el => {
     const centerY = rect.top + rect.height / 2;
     return centerX >= 0 && centerX <= window.innerWidth && centerY >= 0 && centerY <= window.innerHeight && rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight;
 }).forEach(el => {
-    getDOMRepresentation(el).forEach(e => {
+    retrieveElements(el).forEach(e => {
         appendElement(result_list, e);
     });
 });
 
 // clear all llm-dom-visited attributes
 Array.from(document.querySelectorAll("*")).forEach(el => {
-    el.removeAttribute("llm-dom-skip");
+    el.removeAttribute("textual-browser-env-skip");
 });
 
 return result_list;
