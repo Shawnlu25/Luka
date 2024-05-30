@@ -33,7 +33,7 @@ def visit(
         driver: webdriver.Chrome, 
         element_idx: Dict, 
         url: str
-    ):
+    ) -> ActionResult:
     if url == "about:blank":
         driver.get("about:blank")
         return ActionResult(True)
@@ -51,7 +51,7 @@ def click(
         driver: webdriver.Chrome, 
         element_idx: Dict, 
         id: int
-    ):
+    ) -> ActionResult:
     if id not in element_idx:
         return ActionResult(False, f"Cannot find element with id={id}.")
     

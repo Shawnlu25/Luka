@@ -6,7 +6,7 @@ from selenium import webdriver
 
 from .spaces import Unicode, AnyDict
 from .observations import *
-from .actions import ActionResult, ACTION_GROUP
+from .actions import ActionResult, DEFAULT_ACTIONS
 
 
 TEXT_MAX_LENGTH = 2**32-1
@@ -19,6 +19,7 @@ class TextualBrowserEnv(gym.Env):
             viewport: Tuple[int, int] = (1366, 1024), 
             headless: bool = False,
             timeout_s: int = 20,
+            actions: Dict = DEFAULT_ACTIONS
         ):
         super().__init__()
 
@@ -37,6 +38,7 @@ class TextualBrowserEnv(gym.Env):
         self._element_index: Dict[int, Dict] = {}
 
         # Previous action result
+        self._actions = actions
         self._action_result: ActionResult = ActionResult(True)
 
         self.observation_space = gym.spaces.Dict({
@@ -67,21 +69,22 @@ class TextualBrowserEnv(gym.Env):
         }
 
     def _get_info(self):
+        # TODO: return help text for the available actions
         return {}
 
     def step(self, action):
         command = action["command"]
         args = action["args"]
 
-        if command not in ACTION_GROUP:
+        if command not in self._actions:
             self._action_result = ActionResult(False, f"Command `{command}` not supported.")
             return self._get_obs(), self._get_info()
         
         # Filter out unsupported arguments
-        args = {k:v for k,v in args.items() if k in [param["name"] for param in ACTION_GROUP[command]["params"]]}
+        args = {k:v for k,v in args.items() if k in [param["name"] for param in self._actions[command]["params"]]}
 
         # Check if all required arguments are present and if all type constraints are satisfied
-        for param in ACTION_GROUP[command]["params"]:
+        for param in self._actions[command]["params"]:
             if param["required"] and param["name"] not in args:
                 self._action_result = ActionResult(False, f"Missing required argument `{param['name']}`.")
                 return self._get_obs(), self._get_info()
@@ -92,7 +95,7 @@ class TextualBrowserEnv(gym.Env):
                 args[param["name"]] = None
 
         # Execute the action
-        self._action_result = ACTION_GROUP[command]["function"](self._driver, self._element_index, **args)
+        self._action_result = self._actions[command]["function"](self._driver, self._element_index, **args)
         
         return self._get_obs(), self._get_info()
 
