@@ -16,7 +16,7 @@ class TextualBrowserEnv(gym.Env):
 
     def __init__(
             self, 
-            viewport: Tuple[int, int] = (1366, 1024), 
+            viewport: Tuple[int, int] = (1024, 768), 
             headless: bool = False,
             timeout_s: int = 20,
             actions: Dict = DEFAULT_ACTIONS
@@ -37,8 +37,10 @@ class TextualBrowserEnv(gym.Env):
         # Interactable elements on the page, indexed by id
         self._element_index: Dict[int, Dict] = {}
 
-        # Previous action result
+        # Supported actions
         self._actions = actions
+
+        # Result of the last action
         self._action_result: ActionResult = ActionResult(True)
 
         self.observation_space = gym.spaces.Dict({

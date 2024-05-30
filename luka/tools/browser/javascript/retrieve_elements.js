@@ -16,7 +16,7 @@ const TAGS_PROGRAMMING = "script, noscript, applet, embed, object, param";
 
 
 // Useful functions for processing text elements at both end of an element list
-// The point is to merge text elements rather than having multiple text elements in a row
+// The point is to merge text elements next to each other to minimize number of text elements
 const trimList = (el_list) => {
     if (el_list.length > 0 && el_list[0].tag == "text") {
         el_list[0].text = el_list[0].text.trimStart();
