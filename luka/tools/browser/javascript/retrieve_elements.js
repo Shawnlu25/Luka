@@ -138,7 +138,7 @@ const retrieveElements = (element) => {
     }
 
     if (element.matches("optgroup")) {
-        el_list = [getRepresentationOfElement(element, "select", el_list)];
+        el_list = [getRepresentationOfElement(element, "optgroup", el_list)];
         return el_list;
     }
 

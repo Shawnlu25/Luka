@@ -2,7 +2,6 @@ import pkgutil
 
 from typing import Tuple, List, Dict
 from selenium import webdriver
-from selenium.webdriver.remote.webelement import WebElement
 
 js_retrieve_elements = pkgutil.get_data(__name__, "javascript/retrieve_elements.js").decode("utf-8")
 
@@ -12,7 +11,7 @@ def retrieve_elements_from_viewport(driver: webdriver.Chrome):
 
     idx = 0
     idx_map = {}
-    def assign_idx(elements) -> Tuple[List[Dict], Dict[int, WebElement]]:
+    def assign_idx(elements) -> Tuple[List[Dict], Dict[int, Dict]]:
         nonlocal idx
         for e in elements:
             e["id"] = idx
@@ -20,7 +19,7 @@ def retrieve_elements_from_viewport(driver: webdriver.Chrome):
             if e["children"] != None:
                 assign_idx(e["children"])
             if e["tag"] != "text":
-                idx_map[e["id"]] = e["element"]
+                idx_map[e["id"]] = e
 
     assign_idx(elements)
     return elements, idx_map

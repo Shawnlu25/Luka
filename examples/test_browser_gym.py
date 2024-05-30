@@ -18,12 +18,12 @@ while True:
     print(obs["page_text"])
     print(obs["url"])
     print(obs["scroll_status"])
-
     print(img.shape)    
+    print(obs["action_result"])
     
-    plt.show()
+    #plt.show()
 
-    command = input(colored("> ", "green", attrs=["bold"]))
+    id = input(colored("> ", "green", attrs=["bold"]))
 
-    obs, info = env.step({"command": "click", "args": ["a"]})
+    obs, info = env.step({"command": "click", "args": {"id": int(id)}})
     

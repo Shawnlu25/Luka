@@ -1,22 +1,13 @@
 import gymnasium as gym
-import numpy as np
+import validators
 
 from typing import Tuple, List, Dict
-
 from selenium import webdriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.common import exceptions as E
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 from .spaces import Unicode, AnyDict
 from .observations import *
+from .actions import ActionResult, ACTION_GROUP
 
-import validators
-import atexit
-import os
 
 TEXT_MAX_LENGTH = 2**32-1
 
@@ -43,18 +34,22 @@ class TextualBrowserEnv(gym.Env):
         self._elements: List[Dict] = []
 
         # Interactable elements on the page, indexed by id
-        self._element_index: Dict[int, WebElement] = {}
+        self._element_index: Dict[int, Dict] = {}
+
+        # Previous action result
+        self._action_result: ActionResult = ActionResult(True)
 
         self.observation_space = gym.spaces.Dict({
             "url": Unicode(min_length=0, max_length=TEXT_MAX_LENGTH),
             "scroll_status": AnyDict(),
             "screenshot_base64": Unicode(min_length=0, max_length=TEXT_MAX_LENGTH),
             "page_text": Unicode(min_length=0,max_length=TEXT_MAX_LENGTH),
+            "action_result": AnyDict(),
         })
 
         self.action_space = gym.spaces.Dict({
             "command": Unicode(min_length=0, max_length=TEXT_MAX_LENGTH),
-            "args": gym.spaces.Sequence(Unicode(min_length=1, max_length=TEXT_MAX_LENGTH)),
+            "args": AnyDict(),
         })
 
     def _get_obs(self):
@@ -65,12 +60,39 @@ class TextualBrowserEnv(gym.Env):
             "scroll_status": get_scroll_status(self._driver),
             "screenshot_base64": self._driver.get_screenshot_as_base64(),
             "page_text": get_text_representation(self._elements),
+            "action_result": {
+                "success": self._action_result.success,
+                "message": self._action_result.message,
+            },
         }
 
     def _get_info(self):
         return {}
 
     def step(self, action):
+        command = action["command"]
+        args = action["args"]
+
+        if command not in ACTION_GROUP:
+            self._action_result = ActionResult(False, f"Command `{command}` not supported.")
+            return self._get_obs(), self._get_info()
+        
+        # Filter out unsupported arguments
+        args = {k:v for k,v in args.items() if k in [param["name"] for param in ACTION_GROUP[command]["params"]]}
+
+        # Check if all required arguments are present and if all type constraints are satisfied
+        for param in ACTION_GROUP[command]["params"]:
+            if param["required"] and param["name"] not in args:
+                self._action_result = ActionResult(False, f"Missing required argument `{param['name']}`.")
+                return self._get_obs(), self._get_info()
+            if type(args[param["name"]]) != param["type"]:
+                self._action_result = ActionResult(False, f"Argument `{param['name']}` must be of type `{param['type']}`, but a `{type(args[param["name"]])}` is provided instead.")
+                return self._get_obs(), self._get_info()
+            if param["name"] not in args:
+                args[param["name"]] = None
+
+        # Execute the action
+        self._action_result = ACTION_GROUP[command]["function"](self._driver, self._element_index, **args)
         
         return self._get_obs(), self._get_info()
 
