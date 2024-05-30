@@ -1,15 +1,28 @@
 from .functions import ActionResult, TAGS_CLICKABLE
-from .functions import click
+from .functions import click, visit
 
 ACTION_GROUP = {
     "click": {
         "function": click,
+        "description": f"Click on an element with id=`id`. Only {", ".join(["<" + t + ">" for t in TAGS_CLICKABLE])} elements are clickable.",
         "params": [
             {
                 "name": "id",
                 "type": int,
                 "required": True,
-                "description": f"ID of the element to click. Only {", ".join(["<" + t + ">" for t in TAGS_CLICKABLE])} elements are clickable."
+                "description": "id of the element to click."
+            }
+        ]
+    },
+    "visit": {
+        "function": visit,
+        "description": "Visit a URL in the current tab. Only URLs starting with 'http' or 'https' or `about:blank` are supported.",
+        "params": [
+            {
+                "name": "url",
+                "type": str,
+                "required": True,
+                "description": "URL to visit."
             }
         ]
     }

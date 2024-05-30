@@ -109,9 +109,7 @@ class TextualBrowserEnv(gym.Env):
         if not validators.url(url):
             url = "about:blank"
 
-        self._driver.get(url)
-
-        return self._get_obs(), self._get_info()
+        return self.step({"command": "visit", "args": {"url": url}})
 
     def render(self):
         pass

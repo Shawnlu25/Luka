@@ -1,5 +1,3 @@
-import gymnasium as gym
-
 import base64
 import io
 import matplotlib.pyplot as plt
@@ -8,7 +6,7 @@ import matplotlib.image as mpimg
 from luka.tools.browser import TextualBrowserEnv
 from termcolor import colored
 
-env = TextualBrowserEnv()
+env = TextualBrowserEnv(timeout_s=15)
 obs, info = env.reset(options={"url": "https://www.google.com"})
 
 while True:

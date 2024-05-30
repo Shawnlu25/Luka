@@ -11,6 +11,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from .common import ActionResult, TAGS_CLICKABLE
 
 
+def handle_timeout(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except E.TimeoutException:
+            driver = args[0]
+            driver.execute_script("window.stop();")
+            return ActionResult(True, f"Action timed out. Stopped loading page.")
+    return wrapper
+
 def _scroll_into_view_if_needed(driver: webdriver.Chrome, element: WebElement):
     # NOTE: This method is not supported in all browsers, e.g., Firefox
     #       Check https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoViewIfNeeded
@@ -18,6 +28,25 @@ def _scroll_into_view_if_needed(driver: webdriver.Chrome, element: WebElement):
         "arguments[0].scrollIntoViewIfNeeded(true);", 
         element)
 
+@handle_timeout
+def visit(
+        driver: webdriver.Chrome, 
+        element_idx: Dict, 
+        url: str
+    ):
+    if url == "about:blank":
+        driver.get("about:blank")
+        return ActionResult(True)
+    
+    url = url if url.startswith("http") else "http://" + url
+    if not validators.url(url):
+        return ActionResult(False, f"Invalid URL: {url}")
+
+    driver.get(url)
+
+    return ActionResult(True)
+
+@handle_timeout
 def click(
         driver: webdriver.Chrome, 
         element_idx: Dict, 
@@ -47,8 +76,5 @@ def click(
         return ActionResult(False, f"Element with id={id} is not interactable.")
     except E.ElementNotVisibleException:
         return ActionResult(False, f"Element with id={id} is not visible.")
-    except E.TimeoutException:
-        driver.execute_script("window.stop();")
-        return ActionResult(True, f"Action timed out. Stopped loading page.")
+    
     return ActionResult(True)
-
