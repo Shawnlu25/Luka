@@ -8,7 +8,7 @@ from termcolor import colored
 
 env = TextualBrowserEnv(timeout_s=15)
 obs, info = env.reset(options={"url": "https://www.google.com"})
-
+print(info["actions"])
 while True:
     img = mpimg.imread(io.BytesIO(base64.b64decode(obs["screenshot_base64"])))
     plt.imshow(img)
