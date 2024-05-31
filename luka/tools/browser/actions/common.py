@@ -6,3 +6,4 @@ class ActionResult:
     message: str = ""
 
 TAGS_CLICKABLE = ["link", "button", "checkbox", "radio"]
+TAGS_FILLABLE = ["textinput", "datepicker", "select"]
