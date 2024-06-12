@@ -70,16 +70,9 @@ class TextualBrowserEnv(gym.Env):
             },
         }
 
-    def _get_info(self):
-        help_texts = []
-        for k, v in sorted(self._actions.items(), key=lambda x: x[0]):
-            help_text = f"{k.upper()}\n{v["description"]}\n"
-            for param in v["params"]:
-                help_text += f"    {param["name"]} ({param["type"].__name__}): {param["description"]}\n"
-            help_texts.append(help_text)
-        
+    def _get_info(self):        
         return {
-            "actions": "\n".join(help_texts)
+            "actions": self._actions
         }
 
     def step(self, action):
