@@ -132,7 +132,7 @@ const retrieveElements = (element) => {
         return el_list;
     }
 
-    if (element.matches("select, div[role=combobox]")) {
+    if (element.matches("select, div[role=combobox], div[role=listbox]")) {
         el_list = [getRepresentationOfElement(element, "select", el_list)];
         return el_list;
     }
