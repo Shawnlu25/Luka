@@ -83,7 +83,7 @@ class TextualBrowserEnv(gym.Env):
         }
 
     def step(self, action):
-        command = action["command"]
+        command = action["command"].lower()
         args = action["args"]
 
         if command not in self._actions:
