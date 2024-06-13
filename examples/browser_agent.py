@@ -55,6 +55,7 @@ NOTE:
 * Don't try to interact with elements that you cannot see.
 * Avoid entering made-up information, especially when personal information is involved.
 * If you encounter an exception, an error, an effectless command, or find yourself in a loop or dead-end, avoid repeating the same commands. Try something different to achieve the goal.
+* If you think you have achieved the goal, issue the "complete" command with a message to the user.
 
 
 The current browser content, history of interactions, and objective follow. 
@@ -262,6 +263,7 @@ class BrowserAgent:
                 
                 success, message = self._obs["action_result"]
                 message = f"Action successful!" if success else message
+                message = f"{message}\n current url: {self._obs['url']}\n"
                 msg = Message(role="browser", content=message, timestamp=datetime.now())
                 self._fifo_mem.insert(msg)
                 print(msg)
