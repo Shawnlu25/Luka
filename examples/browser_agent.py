@@ -10,7 +10,7 @@ from termcolor import colored
 from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationError
-from typing import Dict, Union, Literal
+from typing import Dict, Union, Literal, Tuple, List
 
 SYSTEM_PROMPT = """
 You are an agent controlling a browser. You are given:
@@ -20,6 +20,7 @@ You are an agent controlling a browser. You are given:
     (3) a history of previous interactions that lead you to the current state
 
 The format of the browser content is highly simplified; it is a mix of pure text and html tags where all formatting elements are stripped.
+Scroll status is represented as a percentage of the maximum scroll position in both x and y directions at the end of the current viewport.
 Interactive elements such as links, inputs are represented like this:
 
     <link id="1">Some link</link>
@@ -64,6 +65,10 @@ USER_PROMPT = """
 ------------------
 CURRENT BROWSER CONTENT:
 $page_text
+
+$url
+Y-Scroll $percentage_y % ($scroll_y / $scroll_height)
+X-Scroll $percentage_x % ($scroll_x / $scroll_width)
 ------------------
 HISTORY:
 $history
@@ -72,13 +77,49 @@ OBJECTIVE:
 $objective
 ------------------
 YOUR COMMAND:
+You must provide your command through json with following format:
+{
+    "rationale": "",
+    "namespace": "",
+    "command": "",
+    "parameters": {
+        "param1": "",
+    }
+}
 """
 
+def complete_task(message: str = "") -> Tuple[bool, List[Message]]:
+    return True, [Message(role="agent", content=message, timestamp=datetime.now())]
+
+def yield_control(message: str = "") -> Tuple[bool, List[Message]]:
+    agent_msg = Message(role="agent", content=message, timestamp=datetime.now())
+    print(colored("agent: ", "light_green", attrs=["bold"]), colored(message, "light_green"))
+    feedback = input(colored("> ", "light_blue", attrs=["bold"]))
+    return False, [agent_msg, Message(role="user", content=feedback, timestamp=datetime.now())]
+
+def handle_ui_actions(self, action):
+    command = action["command"].lower()
+    parameters = action["parameters"]
+
+    if command not in UI_ACTIONS:
+        return False, [Message(role="agent", content=f"Error: Command `{command}` not supported.", timestamp=datetime.now())]
+    
+    parameters = {k:v for k,v in parameters.items() if k in [param["name"] for param in UI_ACTIONS[command]["params"]]}
+
+    for param in UI_ACTIONS[command]["params"]:
+        if param["required"] and param["name"] not in parameters:
+            return False, [Message(role="agent", content=f"Error: Missing required argument `{param['name']}`.", timestamp=datetime.now())]
+        if type(parameters[param["name"]]) != param["type"]:
+            return False, [Message(role="agent", content=f"Error: Argument `{param['name']}` must be of type `{param['type']}`, but a `{type(parameters[param["name"]])}` is provided instead.", timestamp=datetime.now())]
+        if param["name"] not in parameters:
+            parameters[param["name"]] = None
+    
+    return UI_ACTIONS[command]["function"](**parameters)
 
 # TODO: functions for ui actions
 UI_ACTIONS = {
     "complete": {
-        "function": None,
+        "function": complete_task,
         "description": "Indicate that the user's objective has been achieved and the agent's work is completed.",
         "params": [
             {
@@ -90,7 +131,7 @@ UI_ACTIONS = {
         ]
     },
     "yield": {
-        "function": None,
+        "function": yield_control,
         "description": "Indicate that the agent is yielding control to the user. E.g., when encountering a CAPTCHA, sign-in with username/email/password, entering payment information, etc. The goal is not breach user privacy and security.",
         "params": [
             {
@@ -173,30 +214,39 @@ class BrowserAgent:
         
         completed = False
         while not completed:
-            print(self._obs["page_text"])
-            print(self._obs["scroll_status"])
-            print(self._obs["action_result"])
-
             # Construct system prompt
             system_prompt = SYSTEM_PROMPT.replace("$browser_actions", generate_help_text(self._info["actions"])).replace("$ui_actions", generate_help_text(UI_ACTIONS))
             
             # Construct user prompt
             user_prompt = USER_PROMPT.replace("$page_text", self._obs["page_text"]).replace("$history", str(self._fifo_mem)).replace("$objective", objective)
             
-            reply = self._client.chat.completions.create(
-                model=self._model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    }
-                ],
-                response_model=_AgentReply,
-            )
+            user_prompt = user_prompt.replace("$percentage_y", str(self._obs["scroll_status"]["percentage_y"]*100.0)).replace("$scroll_y", str(self._obs["scroll_status"]["scroll_y"])).replace("$scroll_height", str(self._obs["scroll_status"]["scroll_height"]))
+
+            user_prompt = user_prompt.replace("$percentage_x", str(self._obs["scroll_status"]["percentage_x"]*100.0)).replace("$scroll_x", str(self._obs["scroll_status"]["scroll_x"])).replace("$scroll_width", str(self._obs["scroll_status"]["scroll_width"]))
+
+            user_prompt = user_prompt.replace("$url", self._obs["url"])
+
+            try:
+                reply = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": user_prompt,
+                        }
+                    ],
+                    response_model=_AgentReply,
+                )
+            except ValidationError as e:
+                print(e.errors())
+                exit(0)
+            except InstructorRetryException as e:
+                print(e)
+                exit(0)
 
             msg = Message(role="agent", content=reply.rationale, timestamp=datetime.now())
             self._fifo_mem.insert(msg)
@@ -207,16 +257,22 @@ class BrowserAgent:
             self._fifo_mem.insert(msg)
             print(msg)
 
-            if reply["namespace"] == "browser":
-                self._obs, self._info = self._env.step({"command": reply.command.lower(), "args": reply.parameters})
+            if reply.namespace == "browser":
+                self._obs, self._info = self._env.step({"command": reply.command.lower(), "parameters": reply.parameters})
                 
-            elif reply["namespace"] == "ui":
-                pass
-                
+                success, message = self._obs["action_result"]
+                message = f"Action successful!" if success else message
+                msg = Message(role="browser", content=message, timestamp=datetime.now())
+                self._fifo_mem.insert(msg)
+                print(msg)
 
-
-            
-
+            elif reply.namespace == "ui":
+                completed, messages = handle_ui_actions(self, {"command": reply.command.lower(), "parameters": reply.parameters})
+                for msg in messages:
+                    self._fifo_mem.insert(msg)
+                    print(msg)
+            else:
+                self._fifo_mem.insert(Message(role="agent", content=f"Error: Invalid namespace {reply["namespace"]}", timestamp=datetime.now()))
 
 
 if __name__ == "__main__":

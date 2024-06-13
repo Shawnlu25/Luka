@@ -77,28 +77,28 @@ class TextualBrowserEnv(gym.Env):
 
     def step(self, action):
         command = action["command"].lower()
-        args = action["args"]
+        parameters = action["parameters"]
 
         if command not in self._actions:
             self._action_result = ActionResult(False, f"Command `{command}` not supported.")
             return self._get_obs(), self._get_info()
         
         # Filter out unsupported arguments
-        args = {k:v for k,v in args.items() if k in [param["name"] for param in self._actions[command]["params"]]}
+        parameters = {k:v for k,v in parameters.items() if k in [param["name"] for param in self._actions[command]["params"]]}
 
         # Check if all required arguments are present and if all type constraints are satisfied
         for param in self._actions[command]["params"]:
-            if param["required"] and param["name"] not in args:
+            if param["required"] and param["name"] not in parameters:
                 self._action_result = ActionResult(False, f"Missing required argument `{param['name']}`.")
                 return self._get_obs(), self._get_info()
-            if type(args[param["name"]]) != param["type"]:
-                self._action_result = ActionResult(False, f"Argument `{param['name']}` must be of type `{param['type']}`, but a `{type(args[param["name"]])}` is provided instead.")
+            if param["name"] in parameters and type(parameters[param["name"]]) != param["type"]:
+                self._action_result = ActionResult(False, f"Argument `{param['name']}` must be of type `{param['type']}`, but a `{type(parameters[param["name"]])}` is provided instead.")
                 return self._get_obs(), self._get_info()
-            if param["name"] not in args:
-                args[param["name"]] = None
+            if param["name"] not in parameters:
+                parameters[param["name"]] = None
 
         # Execute the action
-        self._action_result = self._actions[command]["function"](self._driver, self._element_index, **args)
+        self._action_result = self._actions[command]["function"](self._driver, self._element_index, **parameters)
         
         return self._get_obs(), self._get_info()
 
@@ -115,7 +115,7 @@ class TextualBrowserEnv(gym.Env):
         if not validators.url(url):
             url = "about:blank"
 
-        return self.step({"command": "visit", "args": {"url": url}})
+        return self.step({"command": "visit", "parameters": {"url": url}})
 
     def render(self):
         pass
