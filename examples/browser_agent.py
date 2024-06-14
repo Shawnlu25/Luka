@@ -242,7 +242,7 @@ class BrowserAgent:
 
     def run(self, objective):
 
-        objective += "\n" + self._enrich_objective(objective)
+        objective = self._enrich_objective(objective)
         print(objective)
         self._fifo_mem.insert(Message(role="user", content=objective, timestamp=datetime.now()))
         
