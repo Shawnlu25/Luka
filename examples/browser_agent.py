@@ -34,7 +34,6 @@ The browser's responses give you a high-level description or any errors occurred
     [2024-05-01 15:35:30] agent:  VISIT www.amazon.com
     [2024-05-01 15:35:30] chrome: Success. 
                                   Current page: www.amazon.com
-                                  Current scroll position: 0% (scroll-y=0, scroll-height=2094)
 
 You can issue these commands to the browser (namespace="browser"):
 
@@ -55,7 +54,7 @@ NOTE:
 * Don't try to interact with elements that you cannot see.
 * Avoid entering made-up information, especially when personal information is involved.
 * If you encounter an exception, an error, an effectless command, or find yourself in a loop or dead-end, avoid repeating the same commands. Try something different to achieve the goal.
-* If you think you have achieved the goal, issue the "complete" command with a message to the user.
+* Compare current status with the objective criteria. If you think you have achieved the goal, issue the "complete" command with a message to the user.
 
 
 The current browser content, history of interactions, and objective follow. 
@@ -210,7 +209,41 @@ class BrowserAgent:
         self._obs, self._info = self._env.reset(options={"url": "https://www.google.com"})
         self._fifo_mem.reset()
 
+    def _enrich_objective(self, objective):
+        sys_prompt = """
+        The user will give you an objective to achieve something with a browser. Your goal is to expand the objective to include the following information:
+        * Completion criteria: What is the last webpage or the final state of the browser, which is what the user want to see.
+        * Constraints: Are there any constraints or limitations that must be considered while achieving the objective?
+        * Additional information: Any other information that might be useful for the agent to achieve the objective.
+        Now, expand the given objective from the user to include the completion criteria, constraints, and additional information. The total length of the objective should be less than 300 characters.
+        """
+        class Objective(BaseModel):
+            objective: str = Field(..., description="The objective given by the user.")
+            criteria: str = Field(..., description="The completion criteria for the objective.")
+            constraints: str = Field(..., description="The constraints or limitations that must be considered.")
+            additional: str = Field(..., description="Any additional information that might be useful for the agent.")
+
+        reply = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": sys_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": objective,
+                }
+            ],
+            response_model=Objective,
+        )
+        result = f"{reply.objective}\n\nCompletion Criteria: {reply.criteria}\nConstraints: {reply.constraints}\nAdditional Information: {reply.additional}"
+        return result
+
     def run(self, objective):
+
+        objective += "\n" + self._enrich_objective(objective)
+        print(objective)
         self._fifo_mem.insert(Message(role="user", content=objective, timestamp=datetime.now()))
         
         completed = False
@@ -270,6 +303,7 @@ class BrowserAgent:
 
             elif reply.namespace == "ui":
                 completed, messages = handle_ui_actions(self, {"command": reply.command.lower(), "parameters": reply.parameters})
+                self._obs, self._info = self._env.step({"command": "pass", "parameters": {}})
                 for msg in messages:
                     self._fifo_mem.insert(msg)
                     print(msg)

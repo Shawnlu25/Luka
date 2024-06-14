@@ -79,6 +79,10 @@ class TextualBrowserEnv(gym.Env):
         command = action["command"].lower()
         parameters = action["parameters"]
 
+        if command == "pass":
+            self._action_result = ActionResult(True)
+            return self._get_obs(), self._get_info()
+
         if command not in self._actions:
             self._action_result = ActionResult(False, f"Command `{command}` not supported.")
             return self._get_obs(), self._get_info()
