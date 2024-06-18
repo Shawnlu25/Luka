@@ -78,6 +78,8 @@ def click(
         return ActionResult(False, f"Element with id={id} is not interactable.")
     except E.ElementNotVisibleException:
         return ActionResult(False, f"Element with id={id} is not visible.")
+    except E.StaleElementReferenceException:
+        return ActionResult(False, f"Element with id={id} is no longer attached to the DOM.")
     
     return ActionResult(True)
 
@@ -179,6 +181,8 @@ def fill(
         return ActionResult(False, f"Element with id={id} is not interactable.")
     except E.ElementNotVisibleException:
         return ActionResult(False, f"Element with id={id} is not visible.")
+    except E.StaleElementReferenceException:
+        return ActionResult(False, f"Element with id={id} is no longer attached to the DOM.")
 
     return ActionResult(True)
 
